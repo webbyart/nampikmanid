@@ -779,6 +779,22 @@ export default function App() {
             saveLocalDB(db);
             return new Response(JSON.stringify({ success: true, receipt }), { status: 200 });
           }
+
+          // POST /api/login
+          if (path === "login" && method === "POST") {
+            const { username, password } = bodyObj;
+            const normalizedUser = (username || "").trim().toLowerCase();
+            if (normalizedUser === "admin" && password === "admin123") {
+              return new Response(JSON.stringify({ success: true, user: { username: "admin", role: "Admin" } }), { status: 200 });
+            }
+            if (normalizedUser === "sales" && password === "sales123") {
+              return new Response(JSON.stringify({ success: true, user: { username: "sales", role: "Sales" } }), { status: 200 });
+            }
+            if (normalizedUser === "viewer" && password === "viewer123") {
+              return new Response(JSON.stringify({ success: true, user: { username: "viewer", role: "Viewer" } }), { status: 200 });
+            }
+            return new Response(JSON.stringify({ success: false, error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" }), { status: 401 });
+          }
         }
 
         return new Response(JSON.stringify({ error: "Endpoint fallback not found" }), { status: 404 });
