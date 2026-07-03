@@ -44,6 +44,33 @@ export default function App() {
   // API Fetch interceptor (handles Google Sheets Proxy and Client-side Local fallback)
   useEffect(() => {
     const originalFetch = window.fetch;
+    const cache = new Map<string, { data: any; timestamp: number }>();
+
+    const getCachedFetch = async (url: string) => {
+      const now = Date.now();
+      const cached = cache.get(url);
+      if (cached && now - cached.timestamp < 10000) {
+        return new Response(JSON.stringify(cached.data), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      const res = await originalFetch(url);
+      if (res.ok) {
+        const clonedRes = res.clone();
+        try {
+          const data = await clonedRes.json();
+          cache.set(url, { data, timestamp: now });
+        } catch (e) {
+          console.error("Error parsing cached fetch response:", e);
+        }
+      }
+      return res;
+    };
+
+    const clearCache = () => {
+      cache.clear();
+    };
 
     const customFetch = async function (input: RequestInfo | URL, init?: RequestInit) {
       let urlStr = "";
@@ -75,39 +102,46 @@ export default function App() {
             if (!init || !init.method || init.method.toUpperCase() === "GET") {
               // Handle Customers
               if (path === "customers") {
-                const res = await originalFetch(`${gasUrl}?action=customers`);
-                return res;
+                return getCachedFetch(`${gasUrl}?action=customers`);
               }
               
               // Handle Products
               if (path === "products") {
-                const res = await originalFetch(`${gasUrl}?action=products`);
-                return res;
+                return getCachedFetch(`${gasUrl}?action=products`);
               }
               
               // Handle Orders
               if (path === "orders") {
-                const res = await originalFetch(`${gasUrl}?action=orders`);
-                return res;
+                return getCachedFetch(`${gasUrl}?action=orders`);
               }
               
               // Handle Receipts
               if (path === "receipts") {
-                const res = await originalFetch(`${gasUrl}?action=receipts`);
-                return res;
+                return getCachedFetch(`${gasUrl}?action=receipts`);
               }
               
               // Handle Logs
               if (path === "logs") {
-                const res = await originalFetch(`${gasUrl}?action=logs`);
-                return res;
+                return getCachedFetch(`${gasUrl}?action=logs`);
               }
 
               // Handle Order details
               if (path.startsWith("orders/") && path.endsWith("/detail")) {
                 const orderId = path.split("/")[1];
-                const res = await originalFetch(`${gasUrl}?action=orderDetails&orderId=${orderId}`);
-                return res;
+                // Fetch both the order list and the specific order's details from Google Sheets (cached where appropriate)
+                const [ordersRes, detailsRes] = await Promise.all([
+                  getCachedFetch(`${gasUrl}?action=orders`),
+                  getCachedFetch(`${gasUrl}?action=orderDetails&orderId=${orderId}`)
+                ]);
+                const orders = await ordersRes.clone().json();
+                const details = await detailsRes.clone().json();
+                
+                const order = orders.find((o: any) => String(o.id) === String(orderId));
+                
+                return new Response(JSON.stringify({ order, details }), {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" }
+                });
               }
 
               // Handle Global Search (Search across customers, products, orders)
@@ -120,9 +154,9 @@ export default function App() {
 
                 // Fetch all lists from Sheets
                 const [cRes, pRes, oRes] = await Promise.all([
-                  originalFetch(`${gasUrl}?action=customers`),
-                  originalFetch(`${gasUrl}?action=products`),
-                  originalFetch(`${gasUrl}?action=orders`)
+                  getCachedFetch(`${gasUrl}?action=customers`),
+                  getCachedFetch(`${gasUrl}?action=products`),
+                  getCachedFetch(`${gasUrl}?action=orders`)
                 ]);
                 
                 const customers = await cRes.json();
@@ -161,9 +195,9 @@ export default function App() {
                 const toStr = urlObj.searchParams.get("to") || "";
 
                 const [ordersRes, detailsRes, productsRes] = await Promise.all([
-                  originalFetch(`${gasUrl}?action=orders`),
-                  originalFetch(`${gasUrl}?action=orderDetails`),
-                  originalFetch(`${gasUrl}?action=products`)
+                  getCachedFetch(`${gasUrl}?action=orders`),
+                  getCachedFetch(`${gasUrl}?action=orderDetails`),
+                  getCachedFetch(`${gasUrl}?action=products`)
                 ]);
 
                 const orders = await ordersRes.json();
@@ -237,11 +271,11 @@ export default function App() {
               // Handle Dashboard calculations (Calculated dynamically!)
               if (path === "dashboard") {
                 const [ordersRes, customersRes, productsRes, receiptsRes, detailsRes] = await Promise.all([
-                  originalFetch(`${gasUrl}?action=orders`),
-                  originalFetch(`${gasUrl}?action=customers`),
-                  originalFetch(`${gasUrl}?action=products`),
-                  originalFetch(`${gasUrl}?action=receipts`),
-                  originalFetch(`${gasUrl}?action=orderDetails`)
+                  getCachedFetch(`${gasUrl}?action=orders`),
+                  getCachedFetch(`${gasUrl}?action=customers`),
+                  getCachedFetch(`${gasUrl}?action=products`),
+                  getCachedFetch(`${gasUrl}?action=receipts`),
+                  getCachedFetch(`${gasUrl}?action=orderDetails`)
                 ]);
 
                 const orders = await ordersRes.json();
@@ -404,6 +438,7 @@ export default function App() {
               }
 
               if (action) {
+                clearCache();
                 const userObj = localStorage.getItem("maemanit_user") ? JSON.parse(localStorage.getItem("maemanit_user")!) : null;
                 const username = userObj ? userObj.username : "system";
 
