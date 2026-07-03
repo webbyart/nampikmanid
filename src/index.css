@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Prompt", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-emerald-50: #fffbeb;     /* warm cream tint */
+  --color-emerald-100: #fef3c7;    /* light chili-gold border */
+  --color-emerald-200: #fde68a;
+  --color-emerald-300: #fcd34d;
+  --color-emerald-400: #fbbf24;
+  --color-emerald-500: #f97316;    /* spicy orange */
+  --color-emerald-600: #dc2626;    /* vibrant chili red */
+  --color-emerald-700: #b91c1c;    /* deep spicy red */
+  --color-emerald-800: #991b1b;    /* rich roasted chili red */
+  --color-emerald-900: #7f1d1d;    /* deep chili brown */
+}
+
+/* Professional print rules */
+@media print {
+  /* Hide all generic elements */
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .non-printable,
+  header,
+  aside,
+  .non-printable-container > div > div:first-child, /* action bar */
+  button {
+    display: none !important;
+  }
+
+  .printable-only {
+    display: block !important;
+  }
+
+  .non-printable-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background-color: white !important;
+    padding: 0 !important;
+  }
+
+  .non-printable-container > div {
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+
+.printable-only {
+  display: none;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
