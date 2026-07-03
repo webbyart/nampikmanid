@@ -20,6 +20,24 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setLoading(true);
     setError(null);
 
+    // Client-side authentication bypass for master/default accounts (essential for static deployments like Netlify)
+    const normalizedUser = username.trim().toLowerCase();
+    if (normalizedUser === "admin" && password === "admin123") {
+      onLoginSuccess({ username: "admin", role: "Admin" });
+      setLoading(false);
+      return;
+    }
+    if (normalizedUser === "sales" && password === "sales123") {
+      onLoginSuccess({ username: "sales", role: "Sales" });
+      setLoading(false);
+      return;
+    }
+    if (normalizedUser === "viewer" && password === "viewer123") {
+      onLoginSuccess({ username: "viewer", role: "Viewer" });
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/login", {
         method: "POST",
