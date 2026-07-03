@@ -387,9 +387,9 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                       <span className="font-semibold text-gray-800">{o.customerName}</span>
                       <span className="block font-mono text-[9px] text-gray-400 mt-0.5">ID: {o.customerId}</span>
                     </td>
-                    <td className="py-3 px-3 sm:py-4 sm:px-4 text-right font-mono text-gray-500">฿{o.total.toLocaleString()}</td>
-                    <td className="py-3 px-3 sm:py-4 sm:px-4 text-right font-mono text-amber-600">- ฿{o.discount.toLocaleString()}</td>
-                    <td className="py-3 px-3 sm:py-4 sm:px-4 text-right font-mono font-bold text-gray-900">฿{o.netTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-3 px-3 sm:py-4 sm:px-4 text-right font-mono text-gray-500">฿{(Number(o.total) || 0).toLocaleString()}</td>
+                    <td className="py-3 px-3 sm:py-4 sm:px-4 text-right font-mono text-amber-600">- ฿{(Number(o.discount) || 0).toLocaleString()}</td>
+                    <td className="py-3 px-3 sm:py-4 sm:px-4 text-right font-mono font-bold text-gray-900">฿{(Number(o.netTotal) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-3 px-3 sm:py-4 sm:px-4 text-center" onClick={(e) => e.stopPropagation()}>
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
                         o.status === "Paid" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
@@ -464,7 +464,7 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                 </div>
                 <div className="space-y-0.5">
                   <span className="text-[10px] text-gray-400 font-bold block uppercase">ยอดชำระสุทธิ</span>
-                  <span className="text-xs font-mono font-bold text-gray-900">฿{selectedOrder.netTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="text-xs font-mono font-bold text-gray-900">฿{(Number(selectedOrder.netTotal) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
 
@@ -494,7 +494,7 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                             <td className="p-2 text-slate-800 font-semibold">{det.productName}</td>
                             <td className="p-2 text-right font-mono">฿{det.price}</td>
                             <td className="p-2 text-center font-mono font-semibold">{det.quantity}</td>
-                            <td className="p-2 text-right font-mono font-bold text-slate-900 px-3">฿{det.total.toLocaleString()}</td>
+                            <td className="p-2 text-right font-mono font-bold text-slate-900 px-3">฿{(Number(det.total) || 0).toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -507,19 +507,19 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
               <div className="w-64 ml-auto font-sans text-xs space-y-2 pt-3 border-t border-gray-100">
                 <div className="flex justify-between text-gray-500">
                   <span>ยอดรวมสินค้า:</span>
-                  <span className="font-mono">฿{selectedOrder.total.toLocaleString()}</span>
+                  <span className="font-mono">฿{(Number(selectedOrder.total) || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-amber-600">
                   <span>ส่วนลดบิล:</span>
-                  <span className="font-mono">- ฿{selectedOrder.discount.toLocaleString()}</span>
+                  <span className="font-mono">- ฿{(Number(selectedOrder.discount) || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
                   <span>ภาษีมูลค่าเพิ่ม (7% VAT):</span>
-                  <span className="font-mono">฿{selectedOrder.vat.toLocaleString()}</span>
+                  <span className="font-mono">฿{(Number(selectedOrder.vat) || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between font-bold text-sm text-gray-900 pt-1.5 border-t border-dashed border-gray-200">
                   <span>ยอดสุทธิทั้งหมด:</span>
-                  <span className="font-mono text-emerald-600">฿{selectedOrder.netTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="font-mono text-emerald-600">฿{(Number(selectedOrder.netTotal) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
 
@@ -697,7 +697,7 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                                   className="w-14 px-1.5 py-0.5 text-center font-mono border border-gray-200 rounded-md"
                                 />
                               </td>
-                              <td className="p-2 text-right font-mono font-bold text-slate-900">฿{(item.price * item.quantity).toLocaleString()}</td>
+                              <td className="p-2 text-right font-mono font-bold text-slate-900">฿{(Number(item.price * item.quantity) || 0).toLocaleString()}</td>
                               <td className="p-2 text-center">
                                 <button 
                                   type="button"
@@ -752,19 +752,19 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                   <div className="space-y-2.5 pt-3 border-t border-slate-200 text-xs font-sans text-gray-600">
                     <div className="flex justify-between">
                       <span>ยอดรวมสินค้า:</span>
-                      <span className="font-mono font-medium">฿{cartSubtotal.toLocaleString()}</span>
+                      <span className="font-mono font-medium">฿{(Number(cartSubtotal) || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-amber-600">
                       <span>หัก ส่วนลดบิล:</span>
-                      <span className="font-mono font-medium">- ฿{newOrderDiscount.toLocaleString()}</span>
+                      <span className="font-mono font-medium">- ฿{(Number(newOrderDiscount) || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>ภาษีมูลค่าเพิ่ม (7% VAT):</span>
-                      <span className="font-mono font-medium">฿{cartVat.toLocaleString()}</span>
+                      <span className="font-mono font-medium">฿{(Number(cartVat) || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between font-bold text-sm text-slate-900 pt-3 border-t border-dashed border-slate-300">
                       <span>ยอดสุทธิที่ต้องชำระ:</span>
-                      <span className="font-mono text-emerald-600 text-base">฿{cartNetTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-emerald-600 text-base">฿{(Number(cartNetTotal) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </div>

@@ -1281,7 +1281,7 @@ export default function App() {
                           <span className="font-bold text-slate-900">{o.id}</span>
                           <span className="block text-[10px] text-gray-400 mt-0.5">ลูกค้า: {o.customerName} | วันที่บิล: {o.date}</span>
                         </div>
-                        <span className="font-bold font-mono text-slate-900">฿{o.netTotal.toLocaleString()}</span>
+                        <span className="font-bold font-mono text-slate-900">฿{(Number(o.netTotal) || 0).toLocaleString()}</span>
                       </div>
                     ))}
                   </div>
