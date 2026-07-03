@@ -46,11 +46,27 @@ export default function App() {
     const originalFetch = window.fetch;
 
     const customFetch = async function (input: RequestInfo | URL, init?: RequestInit) {
-      const urlStr = typeof input === "string" ? input : (input as any).url || "";
+      let urlStr = "";
+      if (typeof input === "string") {
+        urlStr = input;
+      } else if (input instanceof URL) {
+        urlStr = input.toString();
+      } else if (input && typeof (input as any).url === "string") {
+        urlStr = (input as any).url;
+      }
+
+      let pathname = "";
+      try {
+        const parsedUrl = new URL(urlStr, window.location.origin);
+        pathname = parsedUrl.pathname;
+      } catch (e) {
+        pathname = urlStr.split("?")[0];
+      }
 
       // Only intercept local API requests
-      if (urlStr.startsWith("/api/")) {
-        const path = urlStr.replace("/api/", "");
+      if (pathname.startsWith("/api/")) {
+        const apiIndex = urlStr.indexOf("/api/");
+        const path = urlStr.substring(apiIndex + 5);
 
         // 1. Google Sheets Mode
         if (gasMode && gasUrl) {
