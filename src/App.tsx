@@ -31,14 +31,12 @@ export default function App() {
   const [gasUrl, setGasUrl] = useState<string>(() => {
     return localStorage.getItem("maemanit_gas_url") || "https://script.google.com/macros/s/AKfycbx12JhZOHuZRvMbnO2FxVEed5u7X8IzwB7QgVLz8Zl4rdBmGkXkflmDvMCELQQSEBo3/exec";
   });
-  const [gasMode, setGasMode] = useState<boolean>(() => {
-    return localStorage.getItem("maemanit_gas_mode") === "true";
-  });
+  const [gasMode, setGasMode] = useState<boolean>(true);
 
   // Save GAS config to localStorage when modified
   useEffect(() => {
     localStorage.setItem("maemanit_gas_url", gasUrl);
-    localStorage.setItem("maemanit_gas_mode", String(gasMode));
+    localStorage.setItem("maemanit_gas_mode", "true");
   }, [gasUrl, gasMode]);
 
   // API Fetch interceptor (handles Google Sheets Proxy and Client-side Local fallback)
