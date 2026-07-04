@@ -756,6 +756,63 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                   )}
                 </div>
 
+                {/* Quick-Select Product Catalog Grid */}
+                <div className="space-y-1.5 p-3.5 bg-slate-50 border border-slate-200/60 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-500 font-sans uppercase block">แผงเลือกสินค้าด่วน (คลิกปุ่มเพื่อเลือกสินค้า)</span>
+                    {!newOrderCustId && (
+                      <span className="text-[9px] text-rose-500 font-bold font-sans animate-pulse">⚠️ กรุณาเลือกข้อมูลลูกค้าด้านบนก่อน</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1">
+                    {products
+                      .filter(p => 
+                        !itemSearchText.trim() || 
+                        p.name.toLowerCase().includes(itemSearchText.toLowerCase()) ||
+                        p.barcode.includes(itemSearchText) ||
+                        p.sku.toLowerCase().includes(itemSearchText.toLowerCase())
+                      )
+                      .map(p => {
+                        const ratePrice = getProductPriceForSelectedCustomer(p);
+                        const isInCart = cart.find(item => item.barcode === p.barcode);
+                        const currentQty = isInCart ? isInCart.quantity : 0;
+                        const isOutOfStock = p.stock <= 0;
+                        return (
+                          <button
+                            key={p.barcode}
+                            type="button"
+                            disabled={!newOrderCustId || isOutOfStock}
+                            onClick={() => handleAddCartItem(p)}
+                            className={`flex flex-col p-2 bg-white border rounded-lg text-left transition-all ${
+                              !newOrderCustId 
+                                ? "opacity-40 cursor-not-allowed border-gray-100" 
+                                : isOutOfStock 
+                                  ? "bg-red-50/30 border-red-200 opacity-60 cursor-not-allowed"
+                                  : "border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/10 active:scale-[0.98] cursor-pointer"
+                            }`}
+                          >
+                            <div className="flex justify-between items-start w-full">
+                              <span className="font-bold text-[11px] font-sans text-slate-800 line-clamp-1">{p.name}</span>
+                              {currentQty > 0 && (
+                                <span className="bg-emerald-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">
+                                  เลือกแล้ว x{currentQty}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex justify-between items-end w-full mt-1">
+                              <span className="text-[9px] text-gray-400 font-mono">
+                                รหัส: {p.sku} | คลัง: {isOutOfStock ? <span className="text-rose-500 font-bold">หมด</span> : `${p.stock} ${p.unit}`}
+                              </span>
+                              <span className="font-extrabold font-mono text-[11px] text-emerald-600">
+                                ฿{ratePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
                 {/* 3. Added Items cart table */}
                 <div className="space-y-1.5">
                   <span className="text-[10px] font-bold text-gray-500 font-sans block uppercase">รายการสินค้าในบิล</span>
