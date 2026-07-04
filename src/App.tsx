@@ -43,31 +43,103 @@ export default function App() {
   useEffect(() => {
     const originalFetch = window.fetch;
     const cache = new Map<string, { data: any; timestamp: number }>();
+    let fetchQueue = Promise.resolve<any>(null);
 
-    const getCachedFetch = async (url: string) => {
+    const queueFetch = <T,>(fn: () => Promise<T>): Promise<T> => {
+      const nextPromise = fetchQueue.then(async () => {
+        // Add a 200ms delay to provide breathing room and avoid concurrent locks
+        await new Promise(resolve => setTimeout(resolve, 200));
+        return fn();
+      });
+      fetchQueue = nextPromise.then(() => null).catch(() => null);
+      return nextPromise;
+    };
+
+    const getCachedFetch = async (url: string, forceRefresh = false) => {
       const now = Date.now();
-      const cached = cache.get(url);
-      if (cached && now - cached.timestamp < 10000) {
-        return new Response(JSON.stringify(cached.data), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-      const res = await originalFetch(url);
-      if (res.ok) {
-        const clonedRes = res.clone();
-        try {
-          const data = await clonedRes.json();
-          cache.set(url, { data, timestamp: now });
-        } catch (e) {
-          console.error("Error parsing cached fetch response:", e);
+      const cacheKey = `maemanit_cache_${url}`;
+
+      if (!forceRefresh) {
+        let cached = cache.get(url);
+        if (!cached) {
+          try {
+            const localVal = localStorage.getItem(cacheKey);
+            if (localVal) {
+              cached = JSON.parse(localVal);
+              if (cached) cache.set(url, cached);
+            }
+          } catch (e) {
+            console.error("Error reading localStorage cache:", e);
+          }
+        }
+
+        // Cache duration is 5 minutes (300000ms) for high-performance instant loading
+        if (cached && now - cached.timestamp < 300000) {
+          return new Response(JSON.stringify(cached.data), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
         }
       }
-      return res;
+
+      try {
+        // High-speed parallel fetch (bypassing artificial queuing for read GET requests)
+        const res = await originalFetch(url);
+        if (res.ok) {
+          const clonedRes = res.clone();
+          try {
+            const data = await clonedRes.json();
+            const cacheObj = { data, timestamp: now };
+            cache.set(url, cacheObj);
+            localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
+          } catch (e) {
+            console.error("Error parsing and saving fetch response:", e);
+          }
+        }
+        return res;
+      } catch (err) {
+        console.error("Error fetching URL:", url, err);
+        // Resilient fallback to expired cache if offline or fetch fails
+        let expiredCached = cache.get(url);
+        if (!expiredCached) {
+          try {
+            const localVal = localStorage.getItem(cacheKey);
+            if (localVal) expiredCached = JSON.parse(localVal);
+          } catch (e) {}
+        }
+        if (expiredCached) {
+          console.warn("Serving expired cache due to network error for:", url);
+          return new Response(JSON.stringify(expiredCached.data), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
+      }
+    };
+
+    const safeParseJson = async (res: Response, defaultVal: any = []) => {
+      try {
+        const cloned = res.clone();
+        return await cloned.json();
+      } catch (e) {
+        console.error("Failed to parse response as JSON:", e);
+        try {
+          const text = await res.text();
+          console.warn("Raw response text was:", text.substring(0, 150));
+        } catch (textErr) {}
+        return defaultVal;
+      }
     };
 
     const clearCache = () => {
       cache.clear();
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("maemanit_cache_")) {
+          localStorage.removeItem(key);
+        }
+      }
     };
 
     const customFetch = async function (input: RequestInfo | URL, init?: RequestInit) {
@@ -90,8 +162,13 @@ export default function App() {
 
       // Only intercept local API requests
       if (pathname.startsWith("/api/")) {
-        const apiIndex = urlStr.indexOf("/api/");
-        const path = urlStr.substring(apiIndex + 5);
+        // Use pathname to cleanly bypass /api/ and completely avoid query parameters
+        const path = pathname.substring(5);
+
+        let forceRefresh = false;
+        if (urlStr.includes("nocache=true") || urlStr.includes("refresh=true") || urlStr.includes("t=")) {
+          forceRefresh = true;
+        }
 
         // 1. Google Sheets Mode
         if (gasMode && gasUrl) {
@@ -100,27 +177,52 @@ export default function App() {
             if (!init || !init.method || init.method.toUpperCase() === "GET") {
               // Handle Customers
               if (path === "customers") {
-                return getCachedFetch(`${gasUrl}?action=customers`);
+                return getCachedFetch(`${gasUrl}?action=customers`, forceRefresh);
               }
               
               // Handle Products
               if (path === "products") {
-                return getCachedFetch(`${gasUrl}?action=products`);
+                return getCachedFetch(`${gasUrl}?action=products`, forceRefresh);
               }
               
               // Handle Orders
               if (path === "orders") {
-                return getCachedFetch(`${gasUrl}?action=orders`);
+                return getCachedFetch(`${gasUrl}?action=orders`, forceRefresh);
               }
               
               // Handle Receipts
               if (path === "receipts") {
-                return getCachedFetch(`${gasUrl}?action=receipts`);
+                return getCachedFetch(`${gasUrl}?action=receipts`, forceRefresh);
+              }
+
+              // Handle Payment Accounts
+              if (path === "payment-accounts") {
+                try {
+                  const res = await getCachedFetch(`${gasUrl}?action=paymentAccounts`, forceRefresh);
+                  if (res.ok) {
+                    const data = await res.clone().json();
+                    if (Array.isArray(data) && data.length > 0) {
+                      return res;
+                    }
+                  }
+                } catch (e) {
+                  console.warn("Failed to fetch payment-accounts from GAS, using local fallback:", e);
+                }
+
+                const defaultAccounts = [
+                  { id: "acc-cash", account_code: "ACC-101", account_name: "Cash", account_type: "Cash", status: "active" },
+                  { id: "acc-comp-bank", account_code: "ACC-102", account_name: "Company Bank Account", account_type: "Bank", status: "active" },
+                  { id: "acc-ent-bank", account_code: "ACC-103", account_name: "Enterprise Bank Account", account_type: "Bank", status: "active" }
+                ];
+                return new Response(JSON.stringify(defaultAccounts), {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" }
+                });
               }
               
               // Handle Logs
               if (path === "logs") {
-                return getCachedFetch(`${gasUrl}?action=logs`);
+                return getCachedFetch(`${gasUrl}?action=logs`, forceRefresh);
               }
 
               // Handle Order details
@@ -128,11 +230,11 @@ export default function App() {
                 const orderId = path.split("/")[1];
                 // Fetch both the order list and the specific order's details from Google Sheets (cached where appropriate)
                 const [ordersRes, detailsRes] = await Promise.all([
-                  getCachedFetch(`${gasUrl}?action=orders`),
-                  getCachedFetch(`${gasUrl}?action=orderDetails&orderId=${orderId}`)
+                  getCachedFetch(`${gasUrl}?action=orders`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=orderDetails&orderId=${orderId}`, forceRefresh)
                 ]);
-                const orders = await ordersRes.clone().json();
-                const details = await detailsRes.clone().json();
+                const orders = await safeParseJson(ordersRes);
+                const details = await safeParseJson(detailsRes);
                 
                 const order = orders.find((o: any) => String(o.id) === String(orderId));
                 
@@ -152,14 +254,14 @@ export default function App() {
 
                 // Fetch all lists from Sheets
                 const [cRes, pRes, oRes] = await Promise.all([
-                  getCachedFetch(`${gasUrl}?action=customers`),
-                  getCachedFetch(`${gasUrl}?action=products`),
-                  getCachedFetch(`${gasUrl}?action=orders`)
+                  getCachedFetch(`${gasUrl}?action=customers`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=products`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=orders`, forceRefresh)
                 ]);
                 
-                const customers = await cRes.json();
-                const products = await pRes.json();
-                const orders = await oRes.json();
+                const customers = await safeParseJson(cRes);
+                const products = await safeParseJson(pRes);
+                const orders = await safeParseJson(oRes);
 
                 const filteredC = customers.filter((c: any) => 
                   (c.id && c.id.toLowerCase().includes(q)) || 
@@ -193,14 +295,14 @@ export default function App() {
                 const toStr = urlObj.searchParams.get("to") || "";
 
                 const [ordersRes, detailsRes, productsRes] = await Promise.all([
-                  getCachedFetch(`${gasUrl}?action=orders`),
-                  getCachedFetch(`${gasUrl}?action=orderDetails`),
-                  getCachedFetch(`${gasUrl}?action=products`)
+                  getCachedFetch(`${gasUrl}?action=orders`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=orderDetails`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=products`, forceRefresh)
                 ]);
 
-                const orders = await ordersRes.json();
-                const orderDetails = await detailsRes.json();
-                const products = await productsRes.json();
+                const orders = await safeParseJson(ordersRes);
+                const orderDetails = await safeParseJson(detailsRes);
+                const products = await safeParseJson(productsRes);
 
                 const activeOrders = orders.filter((o: any) => o.status !== "Draft");
                 const dateFrom = fromStr ? new Date(fromStr) : new Date(0);
@@ -269,18 +371,18 @@ export default function App() {
               // Handle Dashboard calculations (Calculated dynamically!)
               if (path === "dashboard") {
                 const [ordersRes, customersRes, productsRes, receiptsRes, detailsRes] = await Promise.all([
-                  getCachedFetch(`${gasUrl}?action=orders`),
-                  getCachedFetch(`${gasUrl}?action=customers`),
-                  getCachedFetch(`${gasUrl}?action=products`),
-                  getCachedFetch(`${gasUrl}?action=receipts`),
-                  getCachedFetch(`${gasUrl}?action=orderDetails`)
+                  getCachedFetch(`${gasUrl}?action=orders`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=customers`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=products`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=receipts`, forceRefresh),
+                  getCachedFetch(`${gasUrl}?action=orderDetails`, forceRefresh)
                 ]);
 
-                const orders = await ordersRes.json();
-                const customers = await customersRes.json();
-                const products = await productsRes.json();
-                const receipts = await receiptsRes.json();
-                const orderDetails = await detailsRes.json();
+                const orders = await safeParseJson(ordersRes);
+                const customers = await safeParseJson(customersRes);
+                const products = await safeParseJson(productsRes);
+                const receipts = await safeParseJson(receiptsRes);
+                const orderDetails = await safeParseJson(detailsRes);
 
                 const activeOrders = orders.filter((o: any) => o.status !== "Draft");
                 
@@ -494,6 +596,11 @@ export default function App() {
             orders: [],
             orderDetails: [],
             receipts: [],
+            paymentAccounts: [
+              { id: "acc-cash", account_code: "ACC-101", account_name: "Cash", account_type: "Cash", status: "active" },
+              { id: "acc-comp-bank", account_code: "ACC-102", account_name: "Company Bank Account", account_type: "Bank", status: "active" },
+              { id: "acc-ent-bank", account_code: "ACC-103", account_name: "Enterprise Bank Account", account_type: "Bank", status: "active" }
+            ],
             logs: [
               { date: new Date().toISOString().substring(0, 10), time: new Date().toLocaleTimeString(), user: "system", action: "เปิดใช้งานฐานข้อมูลเบราว์เซอร์จำลอง", oldValue: "-", newValue: "ระบบพร้อมทำงานออฟไลน์แบบพกพา" }
             ]
@@ -516,6 +623,14 @@ export default function App() {
           if (path === "orders") return new Response(JSON.stringify(db.orders), { status: 200 });
           if (path === "receipts") return new Response(JSON.stringify(db.receipts), { status: 200 });
           if (path === "logs") return new Response(JSON.stringify(db.logs), { status: 200 });
+          if (path === "payment-accounts") {
+            const accounts = db.paymentAccounts || [
+              { id: "acc-cash", account_code: "ACC-101", account_name: "Cash", account_type: "Cash", status: "active" },
+              { id: "acc-comp-bank", account_code: "ACC-102", account_name: "Company Bank Account", account_type: "Bank", status: "active" },
+              { id: "acc-ent-bank", account_code: "ACC-103", account_name: "Enterprise Bank Account", account_type: "Bank", status: "active" }
+            ];
+            return new Response(JSON.stringify(accounts), { status: 200 });
+          }
           if (path.startsWith("orders/") && path.endsWith("/detail")) {
             const orderId = path.split("/")[1];
             const details = db.orderDetails.filter((d: any) => d.orderId === orderId);
@@ -753,6 +868,20 @@ export default function App() {
                 }
               }
             });
+
+            // If marked Paid, auto-generate a receipt as well
+            if (newOrder.status === "Paid") {
+              const receiptSeq = db.receipts.filter((r: any) => r.date === newOrder.date).length + 1;
+              const receiptId = `RCP-${dateStr}-${String(receiptSeq).padStart(3, "0")}`;
+              db.receipts.push({
+                id: receiptId,
+                orderId: orderId,
+                date: newOrder.date,
+                amount: newOrder.netTotal,
+                method: "เงินสด",
+                account: bodyObj.paymentAccount || "Cash"
+              });
+            }
 
             // log action
             db.logs.push({

@@ -5,7 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { 
   Customer, Product, SalesOrder, SalesDetail, 
   Receipt, PaymentChannel, HistoryLog, AuditLog, 
-  User, AppSetting 
+  User, AppSetting, PaymentAccount 
 } from "./src/types";
 
 // Database File Path
@@ -23,6 +23,7 @@ interface DatabaseState {
   history: HistoryLog[];
   logs: AuditLog[];
   users: User[];
+  paymentAccounts: PaymentAccount[];
 }
 
 // Initial Data Setup in case db.json doesn't exist
@@ -180,7 +181,8 @@ const INITIAL_DATABASE: DatabaseState = {
       vat: 70,
       netTotal: 1070,
       status: "Paid",
-      paymentStatus: "Paid"
+      paymentStatus: "Paid",
+      payment_account_id: "acc-comp-bank"
     },
     {
       id: "INV-260702-001",
@@ -192,7 +194,8 @@ const INITIAL_DATABASE: DatabaseState = {
       vat: 31.5,
       netTotal: 481.5,
       status: "Confirmed",
-      paymentStatus: "Unpaid"
+      paymentStatus: "Unpaid",
+      payment_account_id: "acc-cash"
     },
     {
       id: "INV-260702-002",
@@ -204,7 +207,8 @@ const INITIAL_DATABASE: DatabaseState = {
       vat: 99.4,
       netTotal: 1519.4,
       status: "Draft",
-      paymentStatus: "Unpaid"
+      paymentStatus: "Unpaid",
+      payment_account_id: "acc-cash"
     }
   ],
   orderDetails: [
@@ -239,6 +243,11 @@ const INITIAL_DATABASE: DatabaseState = {
     { username: "admin", role: "Admin" }, // Password: admin (Simulated in local auth)
     { username: "sales", role: "Sales" }, // Password: sales
     { username: "viewer", role: "Viewer" } // Password: viewer
+  ],
+  paymentAccounts: [
+    { id: "acc-cash", account_code: "ACC-101", account_name: "Cash", account_type: "Cash", status: "active" },
+    { id: "acc-comp-bank", account_code: "ACC-102", account_name: "Company Bank Account", account_type: "Bank", status: "active" },
+    { id: "acc-ent-bank", account_code: "ACC-103", account_name: "Enterprise Bank Account", account_type: "Bank", status: "active" }
   ]
 };
 
@@ -247,7 +256,34 @@ function loadDatabase(): DatabaseState {
   try {
     if (fs.existsSync(DB_FILE)) {
       const content = fs.readFileSync(DB_FILE, "utf-8");
-      return JSON.parse(content);
+      const db = JSON.parse(content) as DatabaseState;
+      let modified = false;
+      
+      // Auto-migrate payment accounts list if missing
+      if (!db.paymentAccounts) {
+        db.paymentAccounts = INITIAL_DATABASE.paymentAccounts;
+        modified = true;
+      }
+      
+      // Auto-migrate orders to have payment_account_id if missing
+      if (db.orders) {
+        db.orders.forEach(o => {
+          if (!o.payment_account_id) {
+            const rec = db.receipts?.find(r => r.orderId === o.id);
+            if (rec && rec.method.includes("โอนเงิน")) {
+              o.payment_account_id = "acc-comp-bank";
+            } else {
+              o.payment_account_id = "acc-cash";
+            }
+            modified = true;
+          }
+        });
+      }
+      
+      if (modified) {
+        writeDatabase(db);
+      }
+      return db;
     }
   } catch (error) {
     console.error("Error loading database file:", error);
@@ -310,6 +346,117 @@ async function startServer() {
     } else {
       res.status(401).json({ success: false, message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin/admin123, sales/sales123)" });
     }
+  });
+
+  // --- Payment Accounts Endpoints ---
+  app.get("/api/payment-accounts", (req, res) => {
+    const db = loadDatabase();
+    res.json(db.paymentAccounts || []);
+  });
+
+  app.post("/api/payment-accounts", (req, res) => {
+    const db = loadDatabase();
+    const { account_code, account_name, account_type } = req.body;
+
+    if (!account_code || !account_name || !account_type) {
+      return res.status(400).json({ success: false, message: "กรุณากรอกข้อมูลรหัสบัญชี ชื่อบัญชี และประเภทบัญชีให้ครบถ้วน" });
+    }
+
+    // Check if account_code or account_name duplicates
+    const isCodeDuplicate = db.paymentAccounts.some(acc => acc.account_code.toLowerCase() === account_code.toLowerCase());
+    const isNameDuplicate = db.paymentAccounts.some(acc => acc.account_name.toLowerCase() === account_name.toLowerCase());
+
+    if (isCodeDuplicate) {
+      return res.status(400).json({ success: false, message: `รหัสบัญชี "${account_code}" มีอยู่ในระบบแล้ว` });
+    }
+    if (isNameDuplicate) {
+      return res.status(400).json({ success: false, message: `ชื่อบัญชี "${account_name}" มีอยู่ในระบบแล้ว` });
+    }
+
+    const nextId = `acc-${Date.now()}`;
+    const newAcc: PaymentAccount = {
+      id: nextId,
+      account_code: account_code.trim(),
+      account_name: account_name.trim(),
+      account_type: account_type.trim(),
+      status: 'active'
+    };
+
+    db.paymentAccounts.push(newAcc);
+    writeDatabase(db);
+    logAction("admin", "สร้างบัญชีรับเงินใหม่", "-", `รหัส: ${newAcc.account_code}, ชื่อ: ${newAcc.account_name}`);
+    res.status(201).json({ success: true, paymentAccount: newAcc });
+  });
+
+  app.put("/api/payment-accounts/:id", (req, res) => {
+    const db = loadDatabase();
+    const { id } = req.params;
+    const { account_code, account_name, account_type, status } = req.body;
+
+    const accIndex = db.paymentAccounts.findIndex(acc => acc.id === id);
+    if (accIndex === -1) {
+      return res.status(404).json({ success: false, message: "ไม่พบข้อมูลบัญชีรับเงิน" });
+    }
+
+    const oldAcc = db.paymentAccounts[accIndex];
+
+    if (!account_code || !account_name || !account_type) {
+      return res.status(400).json({ success: false, message: "กรุณากรอกข้อมูลรหัสบัญชี ชื่อบัญชี และประเภทบัญชีให้ครบถ้วน" });
+    }
+
+    // Check if duplicate of other account code or name
+    const isCodeDuplicate = db.paymentAccounts.some(acc => acc.id !== id && acc.account_code.toLowerCase() === account_code.toLowerCase());
+    const isNameDuplicate = db.paymentAccounts.some(acc => acc.id !== id && acc.account_name.toLowerCase() === account_name.toLowerCase());
+
+    if (isCodeDuplicate) {
+      return res.status(400).json({ success: false, message: `รหัสบัญชี "${account_code}" มีอยู่ในระบบแล้ว` });
+    }
+    if (isNameDuplicate) {
+      return res.status(400).json({ success: false, message: `ชื่อบัญชี "${account_name}" มีอยู่ในระบบแล้ว` });
+    }
+
+    // If making inactive, check if any order currently uses it
+    if (status === 'inactive') {
+      const isUsed = db.orders.some(o => o.payment_account_id === id);
+      if (isUsed) {
+        return res.status(400).json({ success: false, message: "ไม่สามารถระงับการใช้งานบัญชีนี้ได้ เนื่องจากมีใบขาย (Invoice) ที่ผูกกับบัญชีนี้อยู่ในระบบ" });
+      }
+    }
+
+    db.paymentAccounts[accIndex] = {
+      id,
+      account_code: account_code.trim(),
+      account_name: account_name.trim(),
+      account_type: account_type.trim(),
+      status: status || 'active'
+    };
+
+    writeDatabase(db);
+    logAction("admin", "แก้ไขบัญชีรับเงิน", `เดิม: ${oldAcc.account_name}`, `ใหม่: ${account_name}`);
+    res.json({ success: true, paymentAccount: db.paymentAccounts[accIndex] });
+  });
+
+  app.delete("/api/payment-accounts/:id", (req, res) => {
+    const db = loadDatabase();
+    const { id } = req.params;
+
+    const accIndex = db.paymentAccounts.findIndex(acc => acc.id === id);
+    if (accIndex === -1) {
+      return res.status(404).json({ success: false, message: "ไม่พบข้อมูลบัญชีรับเงิน" });
+    }
+
+    const acc = db.paymentAccounts[accIndex];
+
+    // Database foreign key/constraint check: Prevent deletion if used in any invoices/orders
+    const isUsed = db.orders.some(o => o.payment_account_id === id);
+    if (isUsed) {
+      return res.status(400).json({ success: false, message: "ไม่สามารถลบบัญชีนี้ได้ เนื่องจากมีใบขาย (Invoice) ที่อ้างอิงบัญชีนี้อยู่ในคลังข้อมูลตามเงื่อนไขความสัมพันธ์ข้อมูล (Foreign Key Constraint)" });
+    }
+
+    db.paymentAccounts.splice(accIndex, 1);
+    writeDatabase(db);
+    logAction("admin", "ลบบัญชีรับเงิน", acc.account_name, "ลบข้อมูลสำเร็จ");
+    res.json({ success: true, message: "ลบข้อมูลสำเร็จ" });
   });
 
   // 2. GET /api/customers
@@ -499,8 +646,21 @@ async function startServer() {
   // POST /api/order (สร้างใบขายใหม่ พร้อมรายละเอียดสินค้า)
   app.post("/api/order", (req, res) => {
     const db = loadDatabase();
-    const { customerId, discount, items, status } = req.body; // items: Array<{ barcode, quantity, price }>
+    const { customerId, discount, items, status, payment_account_id } = req.body; // items: Array<{ barcode, quantity, price }>
     const userHeader = req.headers["x-user"] as string || "system";
+
+    if (!payment_account_id) {
+      return res.status(400).json({ success: false, message: "กรุณาเลือกบัญชีรับชำระเงิน (Receiving Account) ซึ่งเป็นฟิลด์จำเป็นสำหรับระบบบัญชีและภาษี" });
+    }
+
+    const payAcc = db.paymentAccounts.find(acc => acc.id === payment_account_id);
+    if (!payAcc) {
+      return res.status(400).json({ success: false, message: "ไม่พบบัญชีรับเงินที่เลือกในระบบ" });
+    }
+
+    if (payAcc.status === "inactive") {
+      return res.status(400).json({ success: false, message: `บัญชีรับชำระเงิน "${payAcc.account_name}" อยู่ในสถานะระงับการใช้งาน` });
+    }
 
     const customer = db.customers.find(c => c.id === customerId);
     if (!customer) {
@@ -586,7 +746,8 @@ async function startServer() {
       vat,
       netTotal,
       status: status || "Draft",
-      paymentStatus: status === "Paid" ? "Paid" : "Unpaid"
+      paymentStatus: status === "Paid" ? "Paid" : "Unpaid",
+      payment_account_id: payAcc.id
     };
 
     db.orders.push(newOrder);
@@ -602,8 +763,8 @@ async function startServer() {
         orderId: orderId,
         date: newOrder.date,
         amount: netTotal,
-        method: req.body.paymentMethod || "เงินสด",
-        account: req.body.paymentAccount || "รับสดหน้าร้าน"
+        method: payAcc.account_type === "Cash" ? "เงินสด" : "โอนเงินผ่านธนาคาร",
+        account: payAcc.account_name
       });
     }
 
@@ -635,6 +796,20 @@ async function startServer() {
 
     if (!newStatus) {
       return res.status(400).json({ success: false, message: "กรุณาระบุสถานะใหม่" });
+    }
+
+    const payment_account_id = req.body.payment_account_id || oldOrder.payment_account_id;
+    if (!payment_account_id) {
+      return res.status(400).json({ success: false, message: "กรุณาเลือกบัญชีรับชำระเงิน" });
+    }
+
+    const payAcc = db.paymentAccounts.find(acc => acc.id === payment_account_id);
+    if (!payAcc) {
+      return res.status(400).json({ success: false, message: "ไม่พบบัญชีรับเงินที่เลือกในระบบ" });
+    }
+
+    if (payAcc.status === "inactive") {
+      return res.status(400).json({ success: false, message: `บัญชีรับชำระเงิน "${payAcc.account_name}" อยู่ในสถานะระงับการใช้งาน` });
     }
 
     // Stock deduction adjustments based on transitions
@@ -677,7 +852,8 @@ async function startServer() {
     const updatedOrder: SalesOrder = {
       ...oldOrder,
       status: newStatus,
-      paymentStatus: newStatus === "Paid" ? "Paid" : oldOrder.paymentStatus
+      paymentStatus: newStatus === "Paid" ? "Paid" : oldOrder.paymentStatus,
+      payment_account_id: payAcc.id
     };
 
     db.orders[orderIndex] = updatedOrder;
@@ -698,8 +874,8 @@ async function startServer() {
           orderId: id,
           date: updatedOrder.date,
           amount: updatedOrder.netTotal,
-          method: req.body.paymentMethod || "เงินสด",
-          account: req.body.paymentAccount || "รับสดหน้าร้าน"
+          method: payAcc.account_type === "Cash" ? "เงินสด" : "โอนเงินผ่านธนาคาร",
+          account: payAcc.account_name
         });
       }
     }
@@ -772,13 +948,15 @@ async function startServer() {
     const nextSeqNum = todaysReceipts.length + 1;
     const receiptId = `${datePrefix}-${String(nextSeqNum).padStart(3, "0")}`;
 
+    const payAcc = db.paymentAccounts.find(acc => acc.id === order.payment_account_id) || db.paymentAccounts[0];
+
     const newReceipt: Receipt = {
       id: receiptId,
       orderId: order.id,
       date: now.toISOString().split("T")[0],
       amount: order.netTotal,
-      method: method || "เงินสด",
-      account: account || "แคชเชียร์หลัก"
+      method: payAcc.account_type === "Cash" ? "เงินสด" : "โอนเงินผ่านธนาคาร",
+      account: payAcc.account_name
     };
 
     db.receipts.push(newReceipt);
@@ -883,6 +1061,28 @@ async function startServer() {
       }
     });
 
+    // 5. Receiving Account Detailed breakdown for Today and Month
+    const todayAccountsBreakdown: { [accId: string]: number } = {};
+    const monthAccountsBreakdown: { [accId: string]: number } = {};
+
+    // Initialize with all active payment accounts
+    db.paymentAccounts.forEach(acc => {
+      todayAccountsBreakdown[acc.id] = 0;
+      monthAccountsBreakdown[acc.id] = 0;
+    });
+
+    activeOrders.forEach(o => {
+      const accId = o.payment_account_id || "acc-cash";
+      if (o.status === "Paid") {
+        if (o.date === todayStr) {
+          todayAccountsBreakdown[accId] = (todayAccountsBreakdown[accId] || 0) + o.netTotal;
+        }
+        if (o.date.startsWith(currentMonthPrefix)) {
+          monthAccountsBreakdown[accId] = (monthAccountsBreakdown[accId] || 0) + o.netTotal;
+        }
+      }
+    });
+
     res.json({
       kpis: {
         salesToday,
@@ -898,7 +1098,10 @@ async function startServer() {
         cash: cashSales,
         transfer: transferSales,
         credit: creditSales
-      }
+      },
+      todayAccountsBreakdown,
+      monthAccountsBreakdown,
+      paymentAccounts: db.paymentAccounts
     });
   });
 
@@ -937,40 +1140,170 @@ async function startServer() {
   });
 
 
-  // 8. GET /api/report (ดึงข้อมูลรายงานจำแนกตามประเภท: รายวัน, รายเดือน, รายปี)
+  // 8. GET /api/report (ดึงข้อมูลรายงานจำแนกตามประเภท: รายวัน, รายเดือน, รายปี, ภาษี, แวต, ปิดยอดเงินสด)
   app.get("/api/report", (req, res) => {
     const db = loadDatabase();
-    const { type, from, to } = req.query; // type: 'daily' | 'monthly' | 'customer' | 'products'
+    const { type, from, to, payment_account_id } = req.query; // type: 'daily' | 'monthly' | 'customer' | 'products' | 'vat' | 'tax' | 'sales' | 'cash_closing'
 
     const activeOrders = db.orders.filter(o => o.status !== "Draft");
-    let result: any[] = [];
 
     const dateFrom = from ? new Date(from as string) : new Date(0);
     const dateTo = to ? new Date(to as string) : new Date();
     // set to end of day
     dateTo.setHours(23, 59, 59, 999);
 
-    const filteredOrders = activeOrders.filter(o => {
+    // Apply date filters
+    let filteredOrders = activeOrders.filter(o => {
       const oDate = new Date(o.date);
       return oDate >= dateFrom && oDate <= dateTo;
     });
 
+    // Apply payment account filter if provided and not "all"
+    if (payment_account_id && payment_account_id !== "all") {
+      filteredOrders = filteredOrders.filter(o => o.payment_account_id === payment_account_id);
+    }
+
+    // Calculate aggregated totals categorized by receiving accounts
+    let cashSum = 0;
+    let companyBankSum = 0;
+    let enterpriseBankSum = 0;
+
+    filteredOrders.forEach(o => {
+      if (o.status === "Paid") {
+        if (o.payment_account_id === "acc-cash") {
+          cashSum += o.netTotal;
+        } else if (o.payment_account_id === "acc-comp-bank") {
+          companyBankSum += o.netTotal;
+        } else if (o.payment_account_id === "acc-ent-bank") {
+          enterpriseBankSum += o.netTotal;
+        }
+      }
+    });
+
+    const reportSummary = {
+      cashTotal: cashSum,
+      companyBankTotal: companyBankSum,
+      enterpriseBankTotal: enterpriseBankSum,
+      grandTotal: cashSum + companyBankSum + enterpriseBankSum
+    };
+
+    let result: any[] = [];
+
     if (type === "daily" || type === "monthly") {
-      const groupMap: { [key: string]: { date: string; count: number; total: number; vat: number; netTotal: number } } = {};
+      const groupMap: { [key: string]: { date: string; count: number; total: number; vat: number; netTotal: number; cash: number; compBank: number; entBank: number } } = {};
       
       filteredOrders.forEach(o => {
         // For monthly, group by YYYY-MM. For daily, group by YYYY-MM-DD
         const key = type === "monthly" ? o.date.substring(0, 7) : o.date;
         if (!groupMap[key]) {
-          groupMap[key] = { date: key, count: 0, total: 0, vat: 0, netTotal: 0 };
+          groupMap[key] = { date: key, count: 0, total: 0, vat: 0, netTotal: 0, cash: 0, compBank: 0, entBank: 0 };
         }
         groupMap[key].count++;
         groupMap[key].total += o.total;
         groupMap[key].vat += o.vat;
         groupMap[key].netTotal += o.netTotal;
+
+        if (o.status === "Paid") {
+          if (o.payment_account_id === "acc-cash") {
+            groupMap[key].cash += o.netTotal;
+          } else if (o.payment_account_id === "acc-comp-bank") {
+            groupMap[key].compBank += o.netTotal;
+          } else if (o.payment_account_id === "acc-ent-bank") {
+            groupMap[key].entBank += o.netTotal;
+          }
+        }
       });
 
       result = Object.values(groupMap).sort((a, b) => a.date.localeCompare(b.date));
+
+    } else if (type === "vat") {
+      // VAT Report lists transactions showing invoice detail and vat amounts
+      filteredOrders.forEach(o => {
+        const payAcc = db.paymentAccounts.find(acc => acc.id === o.payment_account_id);
+        result.push({
+          id: o.id,
+          date: o.date,
+          customerName: o.customerName,
+          total: o.total,
+          vat: o.vat,
+          netTotal: o.netTotal,
+          account_code: payAcc ? payAcc.account_code : "-",
+          account_name: payAcc ? payAcc.account_name : "-",
+          status: o.status
+        });
+      });
+      result.sort((a, b) => a.date.localeCompare(b.date));
+
+    } else if (type === "tax") {
+      // Tax Report summarizing totals by accounts
+      const taxGroupMap: { [accId: string]: { account_id: string; account_code: string; account_name: string; count: number; total: number; vat: number; netTotal: number } } = {};
+      
+      db.paymentAccounts.forEach(acc => {
+        taxGroupMap[acc.id] = {
+          account_id: acc.id,
+          account_code: acc.account_code,
+          account_name: acc.account_name,
+          count: 0,
+          total: 0,
+          vat: 0,
+          netTotal: 0
+        };
+      });
+
+      filteredOrders.forEach(o => {
+        const accId = o.payment_account_id || "acc-cash";
+        if (!taxGroupMap[accId]) {
+          const matchedAcc = db.paymentAccounts.find(acc => acc.id === accId);
+          taxGroupMap[accId] = {
+            account_id: accId,
+            account_code: matchedAcc ? matchedAcc.account_code : "N/A",
+            account_name: matchedAcc ? matchedAcc.account_name : "Unknown Account",
+            count: 0,
+            total: 0,
+            vat: 0,
+            netTotal: 0
+          };
+        }
+        taxGroupMap[accId].count++;
+        taxGroupMap[accId].total += o.total;
+        taxGroupMap[accId].vat += o.vat;
+        taxGroupMap[accId].netTotal += o.netTotal;
+      });
+
+      result = Object.values(taxGroupMap);
+
+    } else if (type === "sales") {
+      // Sales Report listing bills and designated accounts
+      filteredOrders.forEach(o => {
+        const payAcc = db.paymentAccounts.find(acc => acc.id === o.payment_account_id);
+        result.push({
+          id: o.id,
+          date: o.date,
+          customerName: o.customerName,
+          account_name: payAcc ? payAcc.account_name : "Cash",
+          total: o.total,
+          vat: o.vat,
+          netTotal: o.netTotal,
+          status: o.status,
+          paymentStatus: o.paymentStatus
+        });
+      });
+      result.sort((a, b) => b.id.localeCompare(a.id));
+
+    } else if (type === "cash_closing") {
+      // Cash Closing Report showing cash received entries
+      const cashOrders = filteredOrders.filter(o => (o.payment_account_id === "acc-cash" || o.payment_account_id === "") && o.status === "Paid");
+      cashOrders.forEach(o => {
+        result.push({
+          id: o.id,
+          date: o.date,
+          customerName: o.customerName,
+          cashReceived: o.netTotal,
+          status: o.status
+        });
+      });
+      result.sort((a, b) => a.id.localeCompare(b.id));
+
     } else if (type === "customer") {
       const custMap: { [id: string]: { customerId: string; customerName: string; count: number; total: number; netTotal: number } } = {};
 
@@ -1008,7 +1341,10 @@ async function startServer() {
       result = Object.values(prodMap).sort((a, b) => b.qty - a.qty);
     }
 
-    res.json(result);
+    res.json({
+      data: result,
+      summary: reportSummary
+    });
   });
 
   // 9. Audit Logs Endpoint

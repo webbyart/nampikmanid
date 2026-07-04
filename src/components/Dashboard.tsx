@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { 
   TrendingUp, Users, Package, AlertCircle, 
-  CreditCard, DollarSign, Award, ChevronRight, RefreshCw 
+  CreditCard, DollarSign, Award, ChevronRight, RefreshCw, Landmark
 } from "lucide-react";
 
 interface DashboardProps {
@@ -53,7 +53,15 @@ export default function Dashboard({ userRole }: DashboardProps) {
     );
   }
 
-  const { kpis, dailyChartData, topProducts, paymentSummary } = data;
+  const { 
+    kpis, 
+    dailyChartData, 
+    topProducts, 
+    paymentSummary, 
+    todayAccountsBreakdown = {}, 
+    monthAccountsBreakdown = {}, 
+    paymentAccounts = [] 
+  } = data;
   const totalPayment = (paymentSummary.cash || 0) + (paymentSummary.transfer || 0) + (paymentSummary.credit || 0);
 
   // Simple percentage helpers
@@ -157,6 +165,92 @@ export default function Dashboard({ userRole }: DashboardProps) {
           </div>
           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 shrink-0">
             <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* 3-Account Live Accounting Classification Widgets */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-bold uppercase text-gray-400 font-sans tracking-wider flex items-center gap-1.5">
+          <Landmark className="w-3.5 h-3.5 text-slate-500" />
+          สรุปการปิดบัญชีรับเงินเรียลไทม์ (Live Receiving Accounts Closing)
+        </h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Today's Section */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs space-y-4">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 font-sans flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                ยอดรับชำระวันนี้รายบัญชี (Today's Account Closing)
+              </h3>
+              <p className="text-[10px] text-gray-400 font-sans mt-0.5">สรุปเงินรับจริงในรอบปิดวันเพื่อใช้ส่งรายงานและประมวลภาษี</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3.5 bg-emerald-50/40 rounded-xl border border-emerald-100/50">
+                <span className="text-[10px] text-emerald-700 font-bold block uppercase font-sans">1. เงินสดหน้าร้าน (Cash)</span>
+                <span className="text-sm font-bold font-mono text-emerald-800">
+                  ฿{(todayAccountsBreakdown["acc-cash"] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="p-3.5 bg-blue-50/40 rounded-xl border border-blue-100/50">
+                <span className="text-[10px] text-blue-700 font-bold block uppercase font-sans">2. บัญชีธนาคาร บจก.</span>
+                <span className="text-sm font-bold font-mono text-blue-800">
+                  ฿{(todayAccountsBreakdown["acc-comp-bank"] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="p-3.5 bg-indigo-50/40 rounded-xl border border-indigo-100/50">
+                <span className="text-[10px] text-indigo-700 font-bold block uppercase font-sans">3. บัญชีธนาคาร กิจการ</span>
+                <span className="text-sm font-bold font-mono text-indigo-800">
+                  ฿{(todayAccountsBreakdown["acc-ent-bank"] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200/60">
+                <span className="text-[10px] text-gray-500 font-bold block uppercase font-sans">ยอดรวมชำระวันนี้</span>
+                <span className="text-sm font-extrabold font-mono text-gray-900">
+                  ฿{(kpis.salesToday || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Section */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs space-y-4">
+            <div>
+              <h3 className="text-xs font-bold text-slate-800 font-sans flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                ยอดรับชำระสะสมเดือนนี้ (Monthly Account Closing)
+              </h3>
+              <p className="text-[10px] text-gray-400 font-sans mt-0.5">ยอดรวมแยกกองประเภทเงินสะสมประจำเดือนปัจจุบัน</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3.5 bg-emerald-50/40 rounded-xl border border-emerald-100/50">
+                <span className="text-[10px] text-emerald-700 font-bold block uppercase font-sans">1. เงินสดสะสม (Cash)</span>
+                <span className="text-sm font-bold font-mono text-emerald-800">
+                  ฿{(monthAccountsBreakdown["acc-cash"] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="p-3.5 bg-blue-50/40 rounded-xl border border-blue-100/50">
+                <span className="text-[10px] text-blue-700 font-bold block uppercase font-sans">2. โอนเข้า บจก. สะสม</span>
+                <span className="text-sm font-bold font-mono text-blue-800">
+                  ฿{(monthAccountsBreakdown["acc-comp-bank"] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="p-3.5 bg-indigo-50/40 rounded-xl border border-indigo-100/50">
+                <span className="text-[10px] text-indigo-700 font-bold block uppercase font-sans">3. โอนเข้า กิจการ สะสม</span>
+                <span className="text-sm font-bold font-mono text-indigo-800">
+                  ฿{(monthAccountsBreakdown["acc-ent-bank"] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200/60">
+                <span className="text-[10px] text-gray-500 font-bold block uppercase font-sans">ยอดรวมชำระเดือนนี้</span>
+                <span className="text-sm font-extrabold font-mono text-gray-900">
+                  ฿{(kpis.salesMonth || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

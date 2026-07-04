@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { 
   FileText, Search, PlusCircle, Eye, RefreshCw, X, 
   Trash2, ShoppingBag, DollarSign, Calendar, ChevronRight, 
@@ -32,6 +32,18 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
   const [newOrderCustId, setNewOrderCustId] = useState("");
   const [newOrderDiscount, setNewOrderDiscount] = useState(0);
   const [newOrderStatus, setNewOrderStatus] = useState<"Draft" | "Confirmed" | "Paid">("Draft");
+  const [selectedPaymentAccountId, setSelectedPaymentAccountId] = useState("acc-cash");
+  const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+
+  // Autofocus the barcode search input when Create Modal is opened
+  useEffect(() => {
+    if (createModalOpen) {
+      setTimeout(() => {
+        barcodeInputRef.current?.focus();
+      }, 300);
+    }
+  }, [createModalOpen]);
   
   // Active draft cart items
   const [cart, setCart] = useState<Array<{
@@ -46,6 +58,7 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
   // Live item searching
   const [itemSearchText, setItemSearchText] = useState("");
   const [searchProductResults, setSearchProductResults] = useState<Product[]>([]);
+  const [custSearchText, setCustSearchText] = useState("");
 
   // Simple Notification Toast
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
@@ -58,25 +71,30 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [ordRes, custRes, prodRes] = await Promise.all([
+      const [ordRes, custRes, prodRes, payAccRes] = await Promise.all([
         fetch("/api/orders"),
         fetch("/api/customers"),
-        fetch("/api/products")
+        fetch("/api/products"),
+        fetch("/api/payment-accounts")
       ]);
 
-      if (!ordRes.ok || !custRes.ok || !prodRes.ok) {
+      if (!ordRes.ok || !custRes.ok || !prodRes.ok || !payAccRes.ok) {
         throw new Error("ดาวน์โหลดข้อมูลล้มเหลว");
       }
 
-      const [ordData, custData, prodData] = await Promise.all([
+      const [ordData, custData, prodData, payAccData] = await Promise.all([
         ordRes.json(),
         custRes.json(),
-        prodRes.json()
+        prodRes.json(),
+        payAccRes.json()
       ]);
 
       setOrders(ordData);
-      setCustomers(custData.filter((c: Customer) => c.status === "ใช้งาน"));
-      setProducts(prodData.filter((p: Product) => p.status === "ใช้งาน"));
+      setCustomers(custData.filter((c: Customer) => c.status !== "ระงับ"));
+      setProducts(prodData.filter((p: Product) => p.status !== "ระงับ"));
+      if (Array.isArray(payAccData)) {
+        setPaymentAccounts(payAccData.filter(a => a.status === "active"));
+      }
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -230,9 +248,11 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
       return;
     }
     setNewOrderCustId("");
+    setCustSearchText("");
     setCart([]);
     setNewOrderDiscount(0);
     setNewOrderStatus("Draft");
+    setSelectedPaymentAccountId(paymentAccounts[0]?.id || "acc-cash");
     setCreateModalOpen(true);
   };
 
@@ -258,6 +278,7 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
           customerId: newOrderCustId,
           discount: newOrderDiscount,
           status: newOrderStatus,
+          payment_account_id: selectedPaymentAccountId,
           items: cart.map(item => ({
             barcode: item.barcode,
             quantity: item.quantity,
@@ -445,7 +466,7 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
 
             <div className="p-6 space-y-6 flex-1">
               {/* Summary Metadata */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <div className="space-y-0.5">
                   <span className="text-[10px] text-gray-400 font-bold block uppercase">ลูกค้า</span>
                   <span className="text-xs font-semibold text-gray-800">{selectedOrder.customerName}</span>
@@ -463,8 +484,14 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                   }`}>{selectedOrder.status}</span>
                 </div>
                 <div className="space-y-0.5">
+                  <span className="text-[10px] text-gray-400 font-bold block uppercase">บัญชีรับเงิน</span>
+                  <span className="text-xs font-semibold text-slate-800 block">
+                    {paymentAccounts.find(acc => acc.id === selectedOrder.payment_account_id)?.account_name || "ไม่มีข้อมูล"}
+                  </span>
+                </div>
+                <div className="space-y-0.5">
                   <span className="text-[10px] text-gray-400 font-bold block uppercase">ยอดชำระสุทธิ</span>
-                  <span className="text-xs font-mono font-bold text-gray-900">฿{(Number(selectedOrder.netTotal) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="text-xs font-mono font-bold text-gray-900 block">฿{(Number(selectedOrder.netTotal) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
 
@@ -601,23 +628,68 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                 {/* 1. Customer Dropdown */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-500 font-sans uppercase block">เลือกลูกค้าจัดส่ง *</label>
-                  <select
-                    required
-                    value={newOrderCustId}
-                    onChange={(e) => {
-                      setNewOrderCustId(e.target.value);
-                      setCart([]); // Clear cart to re-calc prices matching new group
-                    }}
-                    className="w-full px-3 py-2 text-xs font-sans border border-gray-200 rounded-lg bg-gray-50/50 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
-                  >
-                    <option value="">-- กรุณาเลือกข้อมูลลูกค้า (เพื่อดึงราคาที่กำหนด) --</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} (กลุ่มราคา: ราคา {c.priceGroup} | {c.paymentTerm})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input 
+                      type="text"
+                      placeholder="🔍 ค้นหารายชื่อลูกค้า (พิมพ์ชื่อ/รหัส)..."
+                      value={custSearchText}
+                      onChange={(e) => setCustSearchText(e.target.value)}
+                      className="sm:w-1/3 px-3 py-2 text-xs font-sans border border-gray-200 rounded-lg bg-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <select
+                      required
+                      value={newOrderCustId}
+                      onChange={(e) => {
+                        setNewOrderCustId(e.target.value);
+                        setCart([]); // Clear cart to re-calc prices matching new group
+                      }}
+                      className="flex-1 px-3 py-2 text-xs font-sans border border-gray-200 rounded-lg bg-gray-50/50 focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value="">-- กรุณาเลือกข้อมูลลูกค้า (เพื่อดึงราคาที่กำหนด) --</option>
+                      {customers
+                        .filter(c => 
+                          c.name.toLowerCase().includes(custSearchText.toLowerCase()) || 
+                          c.id.toLowerCase().includes(custSearchText.toLowerCase()) ||
+                          (c.phone && c.phone.includes(custSearchText))
+                        )
+                        .map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} (กลุ่มราคา: ราคา {c.priceGroup} | {c.paymentTerm})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
                 </div>
+
+                {/* Customer Details Display Panel */}
+                {newOrderCustId && (() => {
+                  const selectedCust = customers.find(c => c.id === newOrderCustId);
+                  if (!selectedCust) return null;
+                  return (
+                    <div className="bg-slate-50 border border-slate-200/60 p-3.5 rounded-xl text-xs font-sans text-slate-700 grid grid-cols-2 gap-x-4 gap-y-2 animate-in fade-in duration-150">
+                      <div>
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase">รหัสลูกค้า</span>
+                        <span className="font-mono font-bold text-slate-900">{selectedCust.id}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase">เงื่อนไขการชำระเงิน</span>
+                        <span className="font-semibold text-slate-800">{selectedCust.paymentTerm || "เงินสด"}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase">ที่อยู่จัดส่งและออกบิล</span>
+                        <span className="text-[11px] text-slate-600 font-medium leading-relaxed block mt-0.5">{selectedCust.address || "ไม่มีที่อยู่"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase">เบอร์โทรศัพท์</span>
+                        <span className="font-semibold">{selectedCust.phone || "-"}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 font-bold block uppercase">กลุ่มและระดับราคา</span>
+                        <span className="font-bold text-emerald-600">ราคา {selectedCust.priceGroup}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* 2. Item Searching */}
                 <div className="space-y-1.5 relative">
@@ -625,11 +697,35 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                   <div className="relative">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                     <input 
+                      ref={barcodeInputRef}
                       type="text" 
                       disabled={!newOrderCustId}
-                      placeholder={newOrderCustId ? "ป้อนชื่อสินค้าน้ำพริก หรือ สแกนบาร์โค้ดสินค้า..." : "กรุณาเลือกลูกค้าก่อนจึงจะเพิ่มสินค้าได้"}
+                      placeholder={newOrderCustId ? "ป้อนชื่อสินค้า หรือ สแกนบาร์โค้ดสแกนเนอร์..." : "กรุณาเลือกลูกค้าก่อนจึงจะเพิ่มสินค้าได้"}
                       value={itemSearchText}
                       onChange={(e) => setItemSearchText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const scanText = itemSearchText.trim();
+                          if (!scanText) return;
+                          
+                          // Match exact barcode or SKU first
+                          const exactMatch = products.find(p => p.barcode === scanText || p.sku.toLowerCase() === scanText.toLowerCase());
+                          if (exactMatch) {
+                            handleAddCartItem(exactMatch);
+                            setItemSearchText("");
+                            setTimeout(() => barcodeInputRef.current?.focus(), 50);
+                          } else {
+                            if (searchProductResults.length > 0) {
+                              handleAddCartItem(searchProductResults[0]);
+                              setItemSearchText("");
+                              setTimeout(() => barcodeInputRef.current?.focus(), 50);
+                            } else {
+                              showToast("error", `ไม่พบสินค้าหรือบาร์โค้ด "${scanText}" ในระบบ`);
+                            }
+                          }
+                        }
+                      }}
                       className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs font-sans focus:outline-hidden focus:ring-1 focus:ring-emerald-500 bg-gray-50/50 disabled:bg-gray-100 disabled:text-gray-400"
                     />
                   </div>
@@ -746,6 +842,57 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                       <option value="Confirmed">ยืนยันบิลค้างรับเงิน (Confirmed - ตัดสต็อกทันที)</option>
                       <option value="Paid">ชำระเงินเรียบร้อยแล้ว (Paid - ตัดสต็อก & ออกใบเสร็จ)</option>
                     </select>
+                  </div>
+
+                  {/* Payment Account Mandatory Field - Always Visible & Required */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-500 font-sans uppercase block">
+                      ผูกบัญชีรายรับรายงานภาษี (Receiving Account) <span className="text-red-500 font-bold">*จำเป็นทุกบิล*</span>
+                    </label>
+                    <div className="grid grid-cols-1 gap-1.5 max-h-[160px] overflow-y-auto pr-1">
+                      {paymentAccounts.length > 0 ? (
+                        paymentAccounts.map((acc) => {
+                          const isSelected = selectedPaymentAccountId === acc.id;
+                          return (
+                            <button
+                              key={acc.id}
+                              type="button"
+                              onClick={() => setSelectedPaymentAccountId(acc.id)}
+                              className={`flex items-center justify-between p-2.5 rounded-lg border text-left transition-all ${
+                                isSelected 
+                                  ? "bg-emerald-50/80 border-emerald-500 ring-1 ring-emerald-500" 
+                                  : "bg-white border-gray-200 hover:bg-gray-50/50"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                                  isSelected ? "border-emerald-500 bg-emerald-500" : "border-gray-300"
+                                }`}>
+                                  {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
+                                </div>
+                                <div>
+                                  <div className="text-[11px] font-bold font-sans text-slate-800">
+                                    {acc.account_name} ({acc.account_code})
+                                  </div>
+                                  <div className="text-[9px] text-gray-400 font-mono">
+                                    {acc.account_type === "Cash" ? "รับชำระด้วยเงินสดหน้าร้าน" : `ธนาคาร: ${acc.bank_name || "-"} | เลขที่: ${acc.account_number || "-"}`}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                                acc.account_type === "Cash" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
+                              }`}>
+                                {acc.account_type === "Cash" ? "Cash" : "Transfer"}
+                              </span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center p-3 text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg">
+                          ไม่พบบัญชีรับชำระเงิน กรุณาตรวจสอบฐานข้อมูล
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Cost breakdown */}

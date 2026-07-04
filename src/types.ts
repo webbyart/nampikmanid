@@ -31,6 +31,14 @@ export interface Product {
   status: 'ใช้งาน' | 'ระงับ'; // สถานะ
 }
 
+export interface PaymentAccount {
+  id: string; // รหัสบัญชี
+  account_code: string; // รหัสผังบัญชี
+  account_name: string; // ชื่อบัญชีรับเงิน
+  account_type: string; // ประเภทบัญชี (เช่น Cash, Bank)
+  status: 'active' | 'inactive'; // สถานะ
+}
+
 export interface SalesOrder {
   id: string; // เลขที่บิล (INV-YYMMDD-XXX)
   date: string; // วันที่
@@ -42,6 +50,7 @@ export interface SalesOrder {
   netTotal: number; // ยอดสุทธิ
   status: 'Draft' | 'Confirmed' | 'Paid'; // สถานะบิล
   paymentStatus: 'Unpaid' | 'Paid'; // ชำระ (เช่น ค้างชำระ / ชำระแล้ว)
+  payment_account_id: string; // บัญชีรับชำระเงิน (Foreign Key)
 }
 
 export interface SalesDetail {
