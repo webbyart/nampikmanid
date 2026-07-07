@@ -19,10 +19,109 @@ import PrintDocument from "./components/PrintDocument";
 
 export default function App() {
   // Authentication states
-  const [currentUser, setCurrentUser] = useState<{ username: string; role: "Admin" | "Sales" | "Viewer" } | null>(() => {
+  const [currentUser, setCurrentUser] = useState<{ username: string; role: "Admin" | "Sales" | "Viewer"; loginTime?: number; lastActive?: number } | null>(() => {
     const saved = localStorage.getItem("maemanit_user");
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    try {
+      const userObj = JSON.parse(saved);
+      const now = Date.now();
+      
+      // Absolute timeout: 24 hours (86400000 ms)
+      const isAbsoluteExpired = userObj.loginTime && (now - userObj.loginTime > 24 * 60 * 60 * 1000);
+      
+      // Inactivity timeout: 1 hour (3600000 ms)
+      const isInactivityExpired = userObj.lastActive && (now - userObj.lastActive > 60 * 60 * 1000);
+      
+      if (isAbsoluteExpired || isInactivityExpired) {
+        localStorage.removeItem("maemanit_user");
+        return null;
+      }
+      return userObj;
+    } catch (e) {
+      return null;
+    }
   });
+
+  // Session Activity and Expiration Tracker
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const updateActivity = () => {
+      const now = Date.now();
+      setCurrentUser(prev => {
+        if (!prev) return null;
+        
+        // Inactivity check
+        const isExpired = prev.lastActive && (now - prev.lastActive > 60 * 60 * 1000); // 1 hour
+        if (isExpired) {
+          localStorage.removeItem("maemanit_user");
+          // Trigger a notification
+          window.dispatchEvent(new CustomEvent("app-notification", {
+            detail: {
+              title: "หมดเวลาเชื่อมต่อ (Session Expired)",
+              message: "คุณไม่ได้ใช้งานระบบเป็นเวลานาน ระบบจึงนำท่านออกจากระบบเพื่อความปลอดภัย",
+              type: "warning"
+            }
+          }));
+          return null;
+        }
+
+        // Update lastActive
+        const updated = { ...prev, lastActive: now };
+        localStorage.setItem("maemanit_user", JSON.stringify(updated));
+        return updated;
+      });
+    };
+
+    // Throttle activity updates to once every 15 seconds for high performance
+    let lastUpdate = Date.now();
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastUpdate > 15000) {
+        lastUpdate = now;
+        updateActivity();
+      }
+    };
+
+    window.addEventListener("mousemove", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("click", handleActivity);
+    window.addEventListener("scroll", handleActivity);
+
+    // Also run a check timer every 1 minute to check for absolute/inactivity timeouts
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setCurrentUser(prev => {
+        if (!prev) return null;
+        
+        const isAbsoluteExpired = prev.loginTime && (now - prev.loginTime > 24 * 60 * 60 * 1000);
+        const isInactivityExpired = prev.lastActive && (now - prev.lastActive > 60 * 60 * 1000);
+        
+        if (isAbsoluteExpired || isInactivityExpired) {
+          localStorage.removeItem("maemanit_user");
+          window.dispatchEvent(new CustomEvent("app-notification", {
+            detail: {
+              title: "หมดเวลาเชื่อมต่อ (Session Expired)",
+              message: isAbsoluteExpired 
+                ? "เซสชันของท่านหมดอายุการใช้งาน 24 ชั่วโมง กรุณาเข้าสู่ระบบใหม่"
+                : "คุณไม่ได้ใช้งานระบบเป็นเวลานาน ระบบจึงนำท่านออกจากระบบเพื่อความปลอดภัย",
+              type: "warning"
+            }
+          }));
+          return null;
+        }
+        return prev;
+      });
+    }, 60000);
+
+    return () => {
+      window.removeEventListener("mousemove", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("click", handleActivity);
+      window.removeEventListener("scroll", handleActivity);
+      clearInterval(interval);
+    };
+  }, [currentUser]);
 
   // Navigation state
   const [currentTab, setCurrentTab] = useState<string>("dashboard");
@@ -76,20 +175,34 @@ export default function App() {
         ]);
       }
     };
+
+    const handleLogoutEvent = () => {
+      localStorage.removeItem("maemanit_user");
+      setCurrentUser(null);
+    };
+
     window.addEventListener("app-notification", handleNotifEvent);
-    return () => window.removeEventListener("app-notification", handleNotifEvent);
+    window.addEventListener("app-logout", handleLogoutEvent);
+    return () => {
+      window.removeEventListener("app-notification", handleNotifEvent);
+      window.removeEventListener("app-logout", handleLogoutEvent);
+    };
   }, []);
 
   // Google Sheets (Apps Script) mode configuration
   const [gasUrl, setGasUrl] = useState<string>(() => {
     return localStorage.getItem("maemanit_gas_url") || "https://script.google.com/macros/s/AKfycbx12JhZOHuZRvMbnO2FxVEed5u7X8IzwB7QgVLz8Zl4rdBmGkXkflmDvMCELQQSEBo3/exec";
   });
-  const [gasMode, setGasMode] = useState<boolean>(true);
+  const [gasMode, setGasMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem("maemanit_gas_mode");
+    // Default to false (Local Demo Mode) so it works instantly on Netlify out-of-the-box!
+    return saved ? saved === "true" : false;
+  });
 
   // Save GAS config to localStorage when modified
   useEffect(() => {
     localStorage.setItem("maemanit_gas_url", gasUrl);
-    localStorage.setItem("maemanit_gas_mode", "true");
+    localStorage.setItem("maemanit_gas_mode", gasMode ? "true" : "false");
   }, [gasUrl, gasMode]);
 
   // API Fetch interceptor (handles Google Sheets Proxy and Client-side Local fallback)
@@ -618,6 +731,13 @@ export default function App() {
         // 2. Normal mode (try active Node.js backend first if not running Google Sheets mode)
         try {
           const originalResponse = await originalFetch(input, init);
+          
+          if (originalResponse.status === 401 || originalResponse.status === 403) {
+            console.warn("Backend returned unauthorized/forbidden. Session cleared.");
+            window.dispatchEvent(new CustomEvent("app-logout"));
+            return originalResponse;
+          }
+
           const contentType = originalResponse.headers.get("content-type") || "";
           
           // On static hosts like Netlify, calling non-existent APIs like /api/customers
@@ -1079,8 +1199,13 @@ export default function App() {
 
   // Handle Login Success
   const handleLoginSuccess = (user: { username: string; role: "Admin" | "Sales" | "Viewer" }) => {
-    localStorage.setItem("maemanit_user", JSON.stringify(user));
-    setCurrentUser(user);
+    const sessionUser = {
+      ...user,
+      loginTime: Date.now(),
+      lastActive: Date.now()
+    };
+    localStorage.setItem("maemanit_user", JSON.stringify(sessionUser));
+    setCurrentUser(sessionUser);
     setCurrentTab("dashboard");
   };
 
