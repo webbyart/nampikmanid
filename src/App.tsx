@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { 
   TrendingUp, Package, Users, FileText, Receipt, 
   BarChart3, Database, LogOut, Search, ShieldCheck, 
-  UserCheck, X, RefreshCw, Sparkles, Menu, ShieldAlert 
+  UserCheck, X, RefreshCw, Sparkles, Menu, ShieldAlert,
+  Bell
 } from "lucide-react";
 
 // Import custom page modules
@@ -26,6 +27,58 @@ export default function App() {
   // Navigation state
   const [currentTab, setCurrentTab] = useState<string>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Notification states
+  const [notifications, setNotifications] = useState<{
+    id: string;
+    title: string;
+    message: string;
+    timestamp: string;
+    read: boolean;
+    type: "info" | "success" | "warning";
+  }[]>(() => {
+    const saved = localStorage.getItem("maemanit_notifications");
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [
+      {
+        id: "notif-welcome",
+        title: "ยินดีต้อนรับสู่ระบบแม่มะลิ",
+        message: "ระบบบริหารจัดการน้ำพริกและงานขายอัจฉริยะพร้อมใช้งานแล้วค่ะ",
+        timestamp: new Date().toISOString(),
+        read: false,
+        type: "success"
+      }
+    ];
+  });
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("maemanit_notifications", JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    const handleNotifEvent = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        const { title, message, type } = customEvent.detail;
+        setNotifications(prev => [
+          {
+            id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            title,
+            message,
+            timestamp: new Date().toISOString(),
+            read: false,
+            type: type || "info"
+          },
+          ...prev
+        ]);
+      }
+    };
+    window.addEventListener("app-notification", handleNotifEvent);
+    return () => window.removeEventListener("app-notification", handleNotifEvent);
+  }, []);
 
   // Google Sheets (Apps Script) mode configuration
   const [gasUrl, setGasUrl] = useState<string>(() => {
@@ -210,9 +263,9 @@ export default function App() {
                 }
 
                 const defaultAccounts = [
-                  { id: "acc-cash", account_code: "ACC-101", account_name: "Cash", account_type: "Cash", status: "active" },
-                  { id: "acc-comp-bank", account_code: "ACC-102", account_name: "Company Bank Account", account_type: "Bank", status: "active" },
-                  { id: "acc-ent-bank", account_code: "ACC-103", account_name: "Enterprise Bank Account", account_type: "Bank", status: "active" }
+                  { id: "acc-cash", account_code: "ACC-101", account_name: "เงินสดหน้าร้าน (Cash)", account_type: "Cash", status: "active" },
+                  { id: "acc-comp-bank", account_code: "ACC-102", account_name: "บัญชีธนาคาร บริษัท บจก. (Company Bank)", account_type: "Bank", status: "active" },
+                  { id: "acc-ent-bank", account_code: "ACC-103", account_name: "บัญชีธนาคาร วิสาหกิจชุมชน (Enterprise Bank)", account_type: "Bank", status: "active" }
                 ];
                 return new Response(JSON.stringify(defaultAccounts), {
                   status: 200,
@@ -597,9 +650,9 @@ export default function App() {
             orderDetails: [],
             receipts: [],
             paymentAccounts: [
-              { id: "acc-cash", account_code: "ACC-101", account_name: "Cash", account_type: "Cash", status: "active" },
-              { id: "acc-comp-bank", account_code: "ACC-102", account_name: "Company Bank Account", account_type: "Bank", status: "active" },
-              { id: "acc-ent-bank", account_code: "ACC-103", account_name: "Enterprise Bank Account", account_type: "Bank", status: "active" }
+              { id: "acc-cash", account_code: "ACC-101", account_name: "เงินสดหน้าร้าน (Cash)", account_type: "Cash", status: "active" },
+              { id: "acc-comp-bank", account_code: "ACC-102", account_name: "บัญชีธนาคาร บริษัท บจก. (Company Bank)", account_type: "Bank", status: "active" },
+              { id: "acc-ent-bank", account_code: "ACC-103", account_name: "บัญชีธนาคาร วิสาหกิจชุมชน (Enterprise Bank)", account_type: "Bank", status: "active" }
             ],
             logs: [
               { date: new Date().toISOString().substring(0, 10), time: new Date().toLocaleTimeString(), user: "system", action: "เปิดใช้งานฐานข้อมูลเบราว์เซอร์จำลอง", oldValue: "-", newValue: "ระบบพร้อมทำงานออฟไลน์แบบพกพา" }
@@ -625,9 +678,9 @@ export default function App() {
           if (path === "logs") return new Response(JSON.stringify(db.logs), { status: 200 });
           if (path === "payment-accounts") {
             const accounts = db.paymentAccounts || [
-              { id: "acc-cash", account_code: "ACC-101", account_name: "Cash", account_type: "Cash", status: "active" },
-              { id: "acc-comp-bank", account_code: "ACC-102", account_name: "Company Bank Account", account_type: "Bank", status: "active" },
-              { id: "acc-ent-bank", account_code: "ACC-103", account_name: "Enterprise Bank Account", account_type: "Bank", status: "active" }
+              { id: "acc-cash", account_code: "ACC-101", account_name: "เงินสดหน้าร้าน (Cash)", account_type: "Cash", status: "active" },
+              { id: "acc-comp-bank", account_code: "ACC-102", account_name: "บัญชีธนาคาร บริษัท บจก. (Company Bank)", account_type: "Bank", status: "active" },
+              { id: "acc-ent-bank", account_code: "ACC-103", account_name: "บัญชีธนาคาร วิสาหกิจชุมชน (Enterprise Bank)", account_type: "Bank", status: "active" }
             ];
             return new Response(JSON.stringify(accounts), { status: 200 });
           }
@@ -1235,26 +1288,138 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right: Global General Search Bar */}
-          <form onSubmit={handleGlobalSearch} className="flex items-center gap-2 max-w-sm w-full relative">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="ค้นหาด่วน (บาร์โค้ด, เลขบิล, ลูกค้า)..."
-                value={globalSearchText}
-                onChange={(e) => setGlobalSearchText(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs font-sans focus:outline-hidden focus:ring-1 focus:ring-emerald-500 bg-gray-50/40"
-              />
+          {/* Right: Global General Search Bar & Notifications */}
+          <div className="flex items-center gap-3 max-w-lg w-full justify-end">
+            <form onSubmit={handleGlobalSearch} className="flex items-center gap-2 max-w-sm w-full relative">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="ค้นหาด่วน (บาร์โค้ด, เลขบิล, ลูกค้า)..."
+                  value={globalSearchText}
+                  onChange={(e) => setGlobalSearchText(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs font-sans focus:outline-hidden focus:ring-1 focus:ring-emerald-500 bg-gray-50/40"
+                />
+              </div>
+              <button 
+                type="submit"
+                disabled={isSearching}
+                className="px-3.5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs shrink-0 cursor-pointer transition-all"
+              >
+                ค้นหา
+              </button>
+            </form>
+
+            {/* Notification Bell Dropdown */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                className="p-2.5 text-gray-600 hover:text-slate-900 hover:bg-gray-50 border border-gray-200/60 rounded-xl cursor-pointer relative transition-all flex items-center justify-center bg-white"
+                title="การแจ้งเตือน"
+              >
+                <Bell className="w-4.5 h-4.5" />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white ring-2 ring-white">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
+
+              {showNotifDropdown && (
+                <>
+                  {/* Backdrop click to close */}
+                  <div 
+                    className="fixed inset-0 z-40 cursor-default" 
+                    onClick={() => setShowNotifDropdown(false)}
+                  />
+                  
+                  {/* Dropdown Card */}
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-gray-100 shadow-xl py-3 z-50 text-left">
+                    <div className="px-4 pb-2 border-b border-gray-100 flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                        <Bell className="w-4 h-4 text-emerald-600" />
+                        การแจ้งเตือน ({notifications.length})
+                      </span>
+                      <div className="flex gap-2 text-[10px]">
+                        {notifications.some(n => !n.read) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+                            }}
+                            className="text-emerald-600 hover:text-emerald-700 font-bold transition-colors cursor-pointer"
+                          >
+                            อ่านทั้งหมด
+                          </button>
+                        )}
+                        <span className="text-gray-200">|</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNotifications([]);
+                          }}
+                          className="text-gray-400 hover:text-rose-500 font-semibold transition-colors cursor-pointer"
+                        >
+                          ล้างทั้งหมด
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 px-4 text-center text-gray-400 flex flex-col items-center justify-center gap-1">
+                          <Bell className="w-8 h-8 text-gray-200 stroke-1" />
+                          <span className="text-xs">ไม่มีรายการแจ้งเตือนใหม่ค่ะ</span>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => (
+                          <div
+                            key={notif.id}
+                            onClick={() => {
+                              // Mark as read
+                              setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+                            }}
+                            className={`p-3.5 hover:bg-gray-50 transition-colors flex gap-3 cursor-pointer relative ${!notif.read ? "bg-emerald-50/25" : ""}`}
+                          >
+                            {!notif.read && (
+                              <span className="absolute top-4 right-4 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                            )}
+                            <div className="shrink-0 mt-0.5">
+                              {notif.type === "success" && (
+                                <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path></svg>
+                                </div>
+                              )}
+                              {notif.type === "warning" && (
+                                <div className="w-7 h-7 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-100">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                </div>
+                              )}
+                              {notif.type === "info" && (
+                                <div className="w-7 h-7 rounded-full bg-sky-50 flex items-center justify-center text-sky-600 border border-sky-100">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 leading-normal">
+                              <p className={`text-xs text-gray-800 ${!notif.read ? "font-bold" : "font-semibold"}`}>{notif.title}</p>
+                              <p className="text-[11px] text-gray-500 mt-0.5 break-all leading-relaxed">{notif.message}</p>
+                              <span className="text-[10px] text-gray-400 mt-1 block">
+                                {new Date(notif.timestamp).toLocaleTimeString("th-TH", { hour: '2-digit', minute: '2-digit' })} น.
+                                {" · "}
+                                {new Date(notif.timestamp).toLocaleDateString("th-TH", { day: 'numeric', month: 'short' })}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            <button 
-              type="submit"
-              disabled={isSearching}
-              className="px-3.5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs shrink-0 cursor-pointer transition-all"
-            >
-              ค้นหา
-            </button>
-          </form>
+          </div>
         </header>
 
         {/* MAIN BODY WORKSPACE */}

@@ -126,6 +126,16 @@ export default function Products({ userRole }: ProductsProps) {
       if (!res.ok) throw new Error(resJson.message || "เกิดข้อผิดพลาดในการบันทึก");
 
       showToast("success", editingProduct ? "แก้ไขข้อมูลสินค้าสำเร็จ!" : "เพิ่มสินค้าใหม่สำเร็จ!");
+      
+      // Dispatch real-time notification
+      window.dispatchEvent(new CustomEvent("app-notification", {
+        detail: {
+          title: editingProduct ? "แก้ไขข้อมูลสินค้าสำเร็จ" : "เพิ่มสินค้าใหม่สำเร็จ",
+          message: `${editingProduct ? "แก้ไข" : "เพิ่ม"}สินค้า "${formData.name}" (บาร์โค้ด: ${formData.barcode}) สต็อกปัจจุบัน: ${formData.stock} ${formData.unit}`,
+          type: "info"
+        }
+      }));
+
       setIsFormOpen(false);
       fetchProducts();
     } catch (err: any) {
@@ -156,6 +166,16 @@ export default function Products({ userRole }: ProductsProps) {
       }
 
       showToast("success", "ลบข้อมูลสินค้าเรียบร้อยแล้ว");
+      
+      // Dispatch real-time notification
+      window.dispatchEvent(new CustomEvent("app-notification", {
+        detail: {
+          title: "ลบสินค้าออกจากระบบ",
+          message: `ลบสินค้า "${name}" (บาร์โค้ด: ${barcode}) ออกจากระบบเรียบร้อยแล้ว`,
+          type: "warning"
+        }
+      }));
+
       fetchProducts();
     } catch (err: any) {
       showToast("error", err.message);

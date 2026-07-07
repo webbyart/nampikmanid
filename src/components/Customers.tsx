@@ -120,6 +120,16 @@ export default function Customers({ userRole }: CustomersProps) {
       if (!res.ok) throw new Error(resJson.message || "เกิดข้อผิดพลาดในการบันทึก");
 
       showToast("success", editingCustomer ? "แก้ไขข้อมูลลูกค้าสำเร็จ!" : "เพิ่มลูกค้าใหม่สำเร็จ!");
+      
+      // Dispatch real-time notification
+      window.dispatchEvent(new CustomEvent("app-notification", {
+        detail: {
+          title: editingCustomer ? "แก้ไขข้อมูลลูกค้าสำเร็จ" : "เพิ่มลูกค้าใหม่สำเร็จ",
+          message: `${editingCustomer ? "แก้ไข" : "เพิ่ม"}ลูกค้า "${formData.name}" (ประเภท: ${formData.type}, โทร: ${formData.phone || "-"}) สำเร็จ`,
+          type: "info"
+        }
+      }));
+
       setIsFormOpen(false);
       fetchCustomers();
     } catch (err: any) {
@@ -150,6 +160,16 @@ export default function Customers({ userRole }: CustomersProps) {
       }
 
       showToast("success", "ลบข้อมูลลูกค้าเรียบร้อยแล้ว");
+      
+      // Dispatch real-time notification
+      window.dispatchEvent(new CustomEvent("app-notification", {
+        detail: {
+          title: "ลบข้อมูลลูกค้า",
+          message: `ลบลูกค้า "${name}" (ID: ${id}) ออกจากระบบเรียบร้อยแล้ว`,
+          type: "warning"
+        }
+      }));
+
       fetchCustomers();
     } catch (err: any) {
       showToast("error", err.message);

@@ -20,9 +20,17 @@ interface PaymentAccount {
 
 interface ReportSummary {
   cashTotal: number;
+  cashVat: number;
+  cashBeforeVat: number;
   companyBankTotal: number;
+  companyBankVat: number;
+  companyBankBeforeVat: number;
   enterpriseBankTotal: number;
+  enterpriseBankVat: number;
+  enterpriseBankBeforeVat: number;
   grandTotal: number;
+  grandVat: number;
+  grandBeforeVat: number;
 }
 
 export default function Reports({ userRole }: ReportsProps) {
@@ -43,9 +51,17 @@ export default function Reports({ userRole }: ReportsProps) {
   const [reportData, setReportData] = useState<any[]>([]);
   const [summary, setSummary] = useState<ReportSummary>({
     cashTotal: 0,
+    cashVat: 0,
+    cashBeforeVat: 0,
     companyBankTotal: 0,
+    companyBankVat: 0,
+    companyBankBeforeVat: 0,
     enterpriseBankTotal: 0,
-    grandTotal: 0
+    enterpriseBankVat: 0,
+    enterpriseBankBeforeVat: 0,
+    grandTotal: 0,
+    grandVat: 0,
+    grandBeforeVat: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +88,20 @@ export default function Reports({ userRole }: ReportsProps) {
       if (!res.ok) throw new Error("ไม่สามารถโหลดสรุปรายงานยอดขายได้");
       const json = await res.json();
       setReportData(json.data || []);
-      setSummary(json.summary || { cashTotal: 0, companyBankTotal: 0, enterpriseBankTotal: 0, grandTotal: 0 });
+      setSummary(json.summary || { 
+        cashTotal: 0, 
+        cashVat: 0,
+        cashBeforeVat: 0,
+        companyBankTotal: 0, 
+        companyBankVat: 0,
+        companyBankBeforeVat: 0,
+        enterpriseBankTotal: 0, 
+        enterpriseBankVat: 0,
+        enterpriseBankBeforeVat: 0,
+        grandTotal: 0,
+        grandVat: 0,
+        grandBeforeVat: 0
+      });
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -370,11 +399,16 @@ export default function Reports({ userRole }: ReportsProps) {
       </div>
 
       {/* AUDIT COMPLIANCE: 3-Account Real-Time Summary Widget Box */}
-      <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-sans mb-4 flex items-center gap-2">
-          <Landmark className="w-4 h-4 text-amber-500" />
-          สรุปการปิดยอดรับเงินแยกช่องทางจัดหมวดหมู่ภาษี (Accounting Classification Summaries)
-        </h3>
+      <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-sans flex items-center gap-2">
+            <Landmark className="w-4 h-4 text-amber-500" />
+            สรุปการปิดยอดรับเงินแยกช่องทางจัดหมวดหมู่ภาษี (Accounting Classification Summaries)
+          </h3>
+          <span className="text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full font-bold">
+            ระบบคำนวณภาษีแยกหมวดหมู่อัตโนมัติ (Real-time Automatic Tax Breakdown)
+          </span>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Card 1: Cash */}
@@ -427,6 +461,105 @@ export default function Reports({ userRole }: ReportsProps) {
                 ฿{summary.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* Detailed Tax Categorization Table (Classified Tax Report) */}
+        <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
+              ตารางสรุปภาษีแยกหมวดหมู่ช่องทางชำระเงิน (Tax & Revenue Classification Table)
+            </h4>
+            <span className="text-[10px] text-slate-500 font-sans">
+              เฉพาะบิลที่รับชำระแล้ว (Paid Status Only) สำหรับยื่นรายงานภาษีมูลค่าเพิ่ม
+            </span>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs font-sans">
+              <thead>
+                <tr className="border-b border-slate-800 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  <th className="py-2.5 px-3">ประเภทบัญชีรับเงิน</th>
+                  <th className="py-2.5 px-3">รหัสผังบัญชี</th>
+                  <th className="py-2.5 px-3 text-right">ยอดก่อนภาษี (Tax Base)</th>
+                  <th className="py-2.5 px-3 text-right text-amber-400">ภาษีมูลค่าเพิ่ม (VAT 7%)</th>
+                  <th className="py-2.5 px-3 text-right text-emerald-400">ยอดเงินรวมรับสุทธิ (Net Total)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-900/50 text-slate-300">
+                {/* 1. Cash */}
+                <tr className="hover:bg-slate-900/30">
+                  <td className="py-3 px-3 font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    เงินสดหน้าร้าน (Cash Account)
+                  </td>
+                  <td className="py-3 px-3 font-mono text-slate-500">acc-cash</td>
+                  <td className="py-3 px-3 text-right font-mono">
+                    ฿{summary.cashBeforeVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-amber-400">
+                    ฿{summary.cashVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-emerald-400 font-bold">
+                    ฿{summary.cashTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+
+                {/* 2. Company Bank */}
+                <tr className="hover:bg-slate-900/30">
+                  <td className="py-3 px-3 font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    บัญชีธนาคาร บจก. (Company Bank Account)
+                  </td>
+                  <td className="py-3 px-3 font-mono text-slate-500">acc-comp-bank</td>
+                  <td className="py-3 px-3 text-right font-mono">
+                    ฿{summary.companyBankBeforeVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-amber-400">
+                    ฿{summary.companyBankVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-blue-400 font-bold">
+                    ฿{summary.companyBankTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+
+                {/* 3. Enterprise Bank */}
+                <tr className="hover:bg-slate-900/30">
+                  <td className="py-3 px-3 font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                    บัญชีธนาคาร วิสาหกิจชุมชน (Enterprise Bank Account)
+                  </td>
+                  <td className="py-3 px-3 font-mono text-slate-500">acc-ent-bank</td>
+                  <td className="py-3 px-3 text-right font-mono">
+                    ฿{summary.enterpriseBankBeforeVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-amber-400">
+                    ฿{summary.enterpriseBankVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-indigo-400 font-bold">
+                    ฿{summary.enterpriseBankTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+
+                {/* 4. Grand Total */}
+                <tr className="bg-slate-900/40 font-bold border-t border-slate-800 text-white">
+                  <td className="py-3.5 px-3 flex items-center gap-1.5 text-emerald-400">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    ยอดรับชำระรวมสุทธิทั้งสิ้น (Grand Total)
+                  </td>
+                  <td className="py-3.5 px-3 font-mono text-slate-400">-</td>
+                  <td className="py-3.5 px-3 text-right font-mono text-slate-100">
+                    ฿{summary.grandBeforeVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-3.5 px-3 text-right font-mono text-amber-300">
+                    ฿{summary.grandVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-3.5 px-3 text-right font-mono text-emerald-400 text-sm font-extrabold">
+                    ฿{summary.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

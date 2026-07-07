@@ -146,6 +146,15 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
 
       showToast("success", `อัปเดตสถานะบิล ${orderId} เป็น [${newStatus}] สำเร็จ!`);
       
+      // Dispatch real-time notification
+      window.dispatchEvent(new CustomEvent("app-notification", {
+        detail: {
+          title: "อัปเดตสถานะเอกสาร",
+          message: `ใบขายเลขที่ ${orderId} ได้ถูกปรับเปลี่ยนสถานะเป็น [${newStatus === "Paid" ? "ชำระเงินแล้ว" : newStatus === "Confirmed" ? "ยืนยันออเดอร์" : "แบบร่าง"}] สำเร็จ`,
+          type: "info"
+        }
+      }));
+      
       // Update local states
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status: newStatus, paymentStatus: newStatus === "Paid" ? "Paid" : selectedOrder.paymentStatus });
@@ -291,6 +300,18 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
       if (!res.ok) throw new Error(data.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูลใบขาย");
 
       showToast("success", `บันทึกใบขายสำเร็จ! เลขที่บิล ${data.order.id}`);
+      
+      // Dispatch real-time notification
+      const customer = customers.find(c => c.id === newOrderCustId);
+      const custName = customer ? customer.name : "ลูกค้าทั่วไป";
+      window.dispatchEvent(new CustomEvent("app-notification", {
+        detail: {
+          title: "บันทึกใบสั่งซื้อใหม่",
+          message: `ใบขายเลขที่ ${data.order.id} สำหรับลูกค้า ${custName} ยอดรวม ฿${data.order.netTotal?.toLocaleString()} (${newOrderStatus === "Paid" ? "ชำระเงินแล้ว" : "รอดำเนินการ"})`,
+          type: "success"
+        }
+      }));
+
       setCreateModalOpen(false);
       fetchData();
     } catch (err: any) {

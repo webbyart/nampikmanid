@@ -245,9 +245,9 @@ const INITIAL_DATABASE: DatabaseState = {
     { username: "viewer", role: "Viewer" } // Password: viewer
   ],
   paymentAccounts: [
-    { id: "acc-cash", account_code: "ACC-101", account_name: "Cash", account_type: "Cash", status: "active" },
-    { id: "acc-comp-bank", account_code: "ACC-102", account_name: "Company Bank Account", account_type: "Bank", status: "active" },
-    { id: "acc-ent-bank", account_code: "ACC-103", account_name: "Enterprise Bank Account", account_type: "Bank", status: "active" }
+    { id: "acc-cash", account_code: "ACC-101", account_name: "เงินสดหน้าร้าน (Cash)", account_type: "Cash", status: "active" },
+    { id: "acc-comp-bank", account_code: "ACC-102", account_name: "บัญชีธนาคาร บริษัท บจก. (Company Bank)", account_type: "Bank", status: "active" },
+    { id: "acc-ent-bank", account_code: "ACC-103", account_name: "บัญชีธนาคาร วิสาหกิจชุมชน (Enterprise Bank)", account_type: "Bank", status: "active" }
   ]
 };
 
@@ -1164,27 +1164,53 @@ async function startServer() {
     }
 
     // Calculate aggregated totals categorized by receiving accounts
-    let cashSum = 0;
-    let companyBankSum = 0;
-    let enterpriseBankSum = 0;
+    let cashNet = 0;
+    let cashVat = 0;
+    let cashBefore = 0;
+
+    let compBankNet = 0;
+    let compBankVat = 0;
+    let compBankBefore = 0;
+
+    let entBankNet = 0;
+    let entBankVat = 0;
+    let entBankBefore = 0;
 
     filteredOrders.forEach(o => {
       if (o.status === "Paid") {
+        const beforeVat = o.netTotal - o.vat;
         if (o.payment_account_id === "acc-cash") {
-          cashSum += o.netTotal;
+          cashNet += o.netTotal;
+          cashVat += o.vat;
+          cashBefore += beforeVat;
         } else if (o.payment_account_id === "acc-comp-bank") {
-          companyBankSum += o.netTotal;
+          compBankNet += o.netTotal;
+          compBankVat += o.vat;
+          compBankBefore += beforeVat;
         } else if (o.payment_account_id === "acc-ent-bank") {
-          enterpriseBankSum += o.netTotal;
+          entBankNet += o.netTotal;
+          entBankVat += o.vat;
+          entBankBefore += beforeVat;
         }
       }
     });
 
     const reportSummary = {
-      cashTotal: cashSum,
-      companyBankTotal: companyBankSum,
-      enterpriseBankTotal: enterpriseBankSum,
-      grandTotal: cashSum + companyBankSum + enterpriseBankSum
+      cashTotal: cashNet,
+      cashVat: cashVat,
+      cashBeforeVat: cashBefore,
+
+      companyBankTotal: compBankNet,
+      companyBankVat: compBankVat,
+      companyBankBeforeVat: compBankBefore,
+
+      enterpriseBankTotal: entBankNet,
+      enterpriseBankVat: entBankVat,
+      enterpriseBankBeforeVat: entBankBefore,
+
+      grandTotal: cashNet + compBankNet + entBankNet,
+      grandVat: cashVat + compBankVat + entBankVat,
+      grandBeforeVat: cashBefore + compBankBefore + entBankBefore
     };
 
     let result: any[] = [];

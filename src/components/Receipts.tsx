@@ -103,6 +103,16 @@ export default function Receipts({ userRole }: ReceiptsProps) {
       if (!res.ok) throw new Error(data.message || "การออกใบเสร็จค้างชำระล้มเหลว");
 
       showToast("success", `รับชำระเงินบิลสำเร็จ! ใบเสร็จเลขที่ ${data.receipt.id}`);
+      
+      // Dispatch real-time notification
+      window.dispatchEvent(new CustomEvent("app-notification", {
+        detail: {
+          title: "รับชำระเงินสำเร็จ",
+          message: `บิลเลขที่ ${selectedOrderId} ชำระยอด ฿${data.receipt.amount?.toLocaleString()} ผ่านช่องทาง [${paymentMethod}] เข้าบัญชี [${paymentAccount}] เรียบร้อย (ใบเสร็จ: ${data.receipt.id})`,
+          type: "success"
+        }
+      }));
+
       setIsModalOpen(false);
       fetchData();
     } catch (err: any) {

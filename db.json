@@ -1,0 +1,347 @@
+{
+  "settings": [
+    {
+      "key": "SHOP_NAME",
+      "value": "น้ำพริกแม่มานิต",
+      "description": "ชื่อร้านค้า"
+    },
+    {
+      "key": "SHOP_ADDRESS",
+      "value": "123/4 หมู่ 5 ต.รอบเวียง อ.เมือง จ.เชียงราย 57000",
+      "description": "ที่อยู่ร้านค้า"
+    },
+    {
+      "key": "TAX_ID",
+      "value": "0575564001234",
+      "description": "เลขประจำตัวผู้เสียภาษี"
+    },
+    {
+      "key": "PHONE",
+      "value": "081-234-5678",
+      "description": "เบอร์โทรศัพท์ติดต่อ"
+    },
+    {
+      "key": "VAT_RATE",
+      "value": "7",
+      "description": "อัตราภาษีมูลค่าเพิ่ม (%)"
+    },
+    {
+      "key": "PROMPT_PAY_ID",
+      "value": "0812345678",
+      "description": "เบอร์พร้อมเพย์สำหรับสร้าง QR"
+    }
+  ],
+  "customers": [
+    {
+      "id": "CUST-001",
+      "name": "ร้านแกงส้มโบราณ (สาขาใหญ่)",
+      "type": "ขายส่ง",
+      "priceGroup": "A",
+      "paymentTerm": "เครดิต 30 วัน",
+      "address": "99/1 ถ.พหลโยธิน ต.เวียง อ.เมือง จ.พะเยา 56000",
+      "phone": "089-765-4321",
+      "email": "kaengsom@gmail.com",
+      "status": "ใช้งาน",
+      "createdAt": "2026-06-01T10:00:00",
+      "updatedAt": "2026-06-01T10:00:00"
+    },
+    {
+      "id": "CUST-002",
+      "name": "คุณวิมล สุวรรณดี",
+      "type": "ขายปลีก",
+      "priceGroup": "C",
+      "paymentTerm": "เงินสด",
+      "address": "45 ถ.ธนาลัย ต.เวียง อ.เมือง จ.เชียงราย 57000",
+      "phone": "084-555-1234",
+      "email": "wimon.s@outlook.com",
+      "status": "ใช้งาน",
+      "createdAt": "2026-06-15T14:30:00",
+      "updatedAt": "2026-06-15T14:30:00"
+    },
+    {
+      "id": "CUST-003",
+      "name": "บจก.ไทยฟู้ดส์ดิสทริบิวเตอร์",
+      "type": "ตัวแทน",
+      "priceGroup": "B",
+      "paymentTerm": "เครดิต 15 วัน",
+      "address": "1018/3 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110",
+      "phone": "02-123-4567",
+      "email": "contact@thaifoods.co.th",
+      "status": "ใช้งาน",
+      "createdAt": "2026-06-20T09:15:00",
+      "updatedAt": "2026-06-20T09:15:00"
+    },
+    {
+      "id": "CUST-004",
+      "name": "ร้านเจ๊หมวย ข้าวแกงสิบแสน",
+      "type": "ขายปลีก",
+      "priceGroup": "C",
+      "paymentTerm": "เงินสด",
+      "address": "12 ถ.ท่าหลวง ต.วัดเกต อ.เมือง จ.เชียงใหม่ 50000",
+      "phone": "081-999-8888",
+      "email": "",
+      "status": "ใช้งาน",
+      "createdAt": "2026-06-28T11:00:00",
+      "updatedAt": "2026-06-28T11:00:00"
+    }
+  ],
+  "products": [
+    {
+      "barcode": "8850123456001",
+      "sku": "PM-001",
+      "name": "น้ำพริกตาแดงรสแซ่บ (กระปุกเล็ก)",
+      "unit": "กระปุก",
+      "priceA": 35,
+      "priceB": 38,
+      "priceC": 45,
+      "cost": 20,
+      "stock": 150,
+      "minStock": 20,
+      "status": "ใช้งาน"
+    },
+    {
+      "barcode": "8850123456002",
+      "sku": "PM-002",
+      "name": "น้ำพริกหนุ่มสูตรดั้งเดิม (กระปุกกลาง)",
+      "unit": "กระปุก",
+      "priceA": 40,
+      "priceB": 42,
+      "priceC": 50,
+      "cost": 25,
+      "stock": 15,
+      "minStock": 30,
+      "status": "ใช้งาน"
+    },
+    {
+      "barcode": "8850123456003",
+      "sku": "PM-003",
+      "name": "น้ำพริกนรกแมงดา (กระปุกเล็ก)",
+      "unit": "กระปุก",
+      "priceA": 35,
+      "priceB": 38,
+      "priceC": 45,
+      "cost": 18,
+      "stock": 220,
+      "minStock": 25,
+      "status": "ใช้งาน"
+    },
+    {
+      "barcode": "8850123456004",
+      "sku": "PM-004",
+      "name": "น้ำพริกเผากุ้งเสวย (กระปุกใหญ่)",
+      "unit": "กระปุก",
+      "priceA": 45,
+      "priceB": 48,
+      "priceC": 55,
+      "cost": 30,
+      "stock": 80,
+      "minStock": 25,
+      "status": "ใช้งาน"
+    },
+    {
+      "barcode": "8850123456005",
+      "sku": "PM-005",
+      "name": "น้ำพริกอ่องเชียงราย (ถุงซีล 500g)",
+      "unit": "ถุง",
+      "priceA": 50,
+      "priceB": 55,
+      "priceC": 65,
+      "cost": 32,
+      "stock": 110,
+      "minStock": 15,
+      "status": "ใช้งาน"
+    },
+    {
+      "barcode": "8850123456006",
+      "sku": "PM-006",
+      "name": "น้ำพริกกากหมูทรงเครื่อง (กระปุกเล็ก)",
+      "unit": "กระปุก",
+      "priceA": 40,
+      "priceB": 45,
+      "priceC": 50,
+      "cost": 26,
+      "stock": 12,
+      "minStock": 20,
+      "status": "ใช้งาน"
+    }
+  ],
+  "orders": [
+    {
+      "id": "INV-260701-001",
+      "date": "2026-07-01",
+      "customerId": "CUST-001",
+      "customerName": "ร้านแกงส้มโบราณ (สาขาใหญ่)",
+      "total": 1050,
+      "discount": 50,
+      "vat": 70,
+      "netTotal": 1070,
+      "status": "Paid",
+      "paymentStatus": "Paid",
+      "payment_account_id": "acc-comp-bank"
+    },
+    {
+      "id": "INV-260702-001",
+      "date": "2026-07-02",
+      "customerId": "CUST-002",
+      "customerName": "คุณวิมล สุวรรณดี",
+      "total": 450,
+      "discount": 0,
+      "vat": 31.5,
+      "netTotal": 481.5,
+      "status": "Confirmed",
+      "paymentStatus": "Unpaid",
+      "payment_account_id": "acc-cash"
+    },
+    {
+      "id": "INV-260702-002",
+      "date": "2026-07-02",
+      "customerId": "CUST-003",
+      "customerName": "บจก.ไทยฟู้ดส์ดิสทริบิวเตอร์",
+      "total": 1520,
+      "discount": 100,
+      "vat": 99.4,
+      "netTotal": 1519.4,
+      "status": "Draft",
+      "paymentStatus": "Unpaid",
+      "payment_account_id": "acc-cash"
+    }
+  ],
+  "orderDetails": [
+    {
+      "orderId": "INV-260701-001",
+      "barcode": "8850123456001",
+      "productName": "น้ำพริกตาแดงรสแซ่บ (กระปุกเล็ก)",
+      "price": 35,
+      "quantity": 30,
+      "total": 1050
+    },
+    {
+      "orderId": "INV-260702-001",
+      "barcode": "8850123456002",
+      "productName": "น้ำพริกหนุ่มสูตรดั้งเดิม (กระปุกกลาง)",
+      "price": 50,
+      "quantity": 9,
+      "total": 450
+    },
+    {
+      "orderId": "INV-260702-002",
+      "barcode": "8850123456003",
+      "productName": "น้ำพริกนรกแมงดา (กระปุกเล็ก)",
+      "price": 38,
+      "quantity": 40,
+      "total": 1520
+    }
+  ],
+  "receipts": [
+    {
+      "id": "RCP-260701-001",
+      "orderId": "INV-260701-001",
+      "date": "2026-07-01",
+      "amount": 1070,
+      "method": "โอนเงินผ่านธนาคาร",
+      "account": "กสิกรไทย (ออมทรัพย์)"
+    }
+  ],
+  "payments": [
+    {
+      "id": "CASH",
+      "name": "เงินสด",
+      "details": "รับเงินสด ณ จุดขาย"
+    },
+    {
+      "id": "TRANSFER",
+      "name": "โอนเงินผ่านธนาคาร",
+      "details": "ธนาคารกสิกรไทย เลขที่บัญชี 123-4-56789-0 บจก.น้ำพริกแม่มานิต"
+    },
+    {
+      "id": "CREDIT",
+      "name": "เครดิตการค้า",
+      "details": "เครดิตการค้า 15-30 วัน ตามประวัติการค้า"
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-07-01",
+      "time": "11:20:15",
+      "orderId": "INV-260701-001",
+      "customerName": "ร้านแกงส้มโบราณ (สาขาใหญ่)",
+      "barcode": "8850123456001",
+      "productName": "น้ำพริกตาแดงรสแซ่บ (กระปุกเล็ก)",
+      "quantity": 30,
+      "price": 35,
+      "total": 1050,
+      "user": "admin"
+    },
+    {
+      "date": "2026-07-02",
+      "time": "14:10:05",
+      "orderId": "INV-260702-001",
+      "customerName": "คุณวิมล สุวรรณดี",
+      "barcode": "8850123456002",
+      "productName": "น้ำพริกหนุ่มสูตรดั้งเดิม (กระปุกกลาง)",
+      "quantity": 9,
+      "price": 50,
+      "total": 450,
+      "user": "sales"
+    },
+    {
+      "date": "2026-07-02",
+      "time": "15:45:10",
+      "orderId": "INV-260702-002",
+      "customerName": "บจก.ไทยฟู้ดส์ดิสทริบิวเตอร์",
+      "barcode": "8850123456003",
+      "productName": "น้ำพริกนรกแมงดา (กระปุกเล็ก)",
+      "quantity": 40,
+      "price": 38,
+      "total": 1520,
+      "user": "admin"
+    }
+  ],
+  "logs": [
+    {
+      "date": "2026-07-02",
+      "time": "20:30:00",
+      "user": "system",
+      "action": "เริ่มต้นระบบฐานข้อมูลจำลอง",
+      "oldValue": "-",
+      "newValue": "เตรียมข้อมูลตัวอย่างสำเร็จ"
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "role": "Admin"
+    },
+    {
+      "username": "sales",
+      "role": "Sales"
+    },
+    {
+      "username": "viewer",
+      "role": "Viewer"
+    }
+  ],
+  "paymentAccounts": [
+    {
+      "id": "acc-cash",
+      "account_code": "ACC-101",
+      "account_name": "เงินสดหน้าร้าน (Cash)",
+      "account_type": "Cash",
+      "status": "active"
+    },
+    {
+      "id": "acc-comp-bank",
+      "account_code": "ACC-102",
+      "account_name": "บัญชีธนาคาร บริษัท บจก. (Company Bank)",
+      "account_type": "Bank",
+      "status": "active"
+    },
+    {
+      "id": "acc-ent-bank",
+      "account_code": "ACC-103",
+      "account_name": "บัญชีธนาคาร วิสาหกิจชุมชน (Enterprise Bank)",
+      "account_type": "Bank",
+      "status": "active"
+    }
+  ]
+}
