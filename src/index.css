@@ -23,6 +23,22 @@
   body {
     background-color: white !important;
     color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  @page {
+    margin: 10mm 15mm 10mm 15mm;
+    size: auto;
+  }
+
+  #root > div,
+  .min-h-screen {
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    min-height: auto !important;
+    background: transparent !important;
   }
   
   .non-printable,
@@ -46,6 +62,14 @@
     overflow: visible !important;
     background-color: white !important;
     padding: 0 !important;
+    z-index: 9999 !important;
+  }
+
+  .non-printable-container,
+  .non-printable-container * {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
   }
 
   .non-printable-container > div {

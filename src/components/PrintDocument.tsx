@@ -62,7 +62,10 @@ export default function PrintDocument({ docType, orderId, onClose }: PrintDocume
           </div>
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => window.print()}
+              onClick={() => {
+                window.focus();
+                window.print();
+              }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs cursor-pointer transition-colors"
             >
               <Printer className="w-3.5 h-3.5" />

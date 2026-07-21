@@ -1464,7 +1464,7 @@ export default function App() {
       </aside>
 
       {/* Main content wrapper */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen non-printable">
         
         {/* TOP LAYOUT BAR */}
         <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between shrink-0 non-printable">
