@@ -2,9 +2,11 @@ import React, { useEffect, useState, useRef } from "react";
 import { 
   FileText, Search, PlusCircle, Eye, RefreshCw, X, 
   Trash2, ShoppingBag, DollarSign, Calendar, ChevronRight, 
-  CheckCircle, ArrowRight, Printer, AlertTriangle, ListFilter
+  CheckCircle, ArrowRight, Printer, AlertTriangle, ListFilter,
+  Camera
 } from "lucide-react";
 import { SalesOrder, Customer, Product, SalesDetail } from "../types";
+import BarcodeScannerModal from "./BarcodeScannerModal";
 
 interface OrdersProps {
   userRole: string;
@@ -35,6 +37,7 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
   const [selectedPaymentAccountId, setSelectedPaymentAccountId] = useState("acc-cash");
   const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
 
   // Autofocus the barcode search input when Create Modal is opened
   useEffect(() => {
@@ -44,6 +47,18 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
       }, 300);
     }
   }, [createModalOpen]);
+
+
+
+  const handleCameraScanSuccess = (scannedText: string) => {
+    const exactMatch = products.find(p => p.barcode === scannedText || p.sku.toLowerCase() === scannedText.toLowerCase());
+    if (exactMatch) {
+      handleAddCartItem(exactMatch);
+      showToast("success", `สแกนสำเร็จ: เพิ่ม "${exactMatch.name}" แล้ว`);
+    } else {
+      showToast("error", `ไม่พบสินค้าบาร์โค้ด "${scannedText}"`);
+    }
+  };
   
   // Active draft cart items
   const [cart, setCart] = useState<Array<{
@@ -226,6 +241,34 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
     setItemSearchText("");
     setSearchProductResults([]);
   };
+
+  // Handle hardware barcode scanned event (globally captured and dispatched)
+  useEffect(() => {
+    if (!createModalOpen) return;
+
+    const handleBarcodeScanned = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const scannedText = customEvent.detail;
+      if (!scannedText) return;
+
+      // Call preventDefault on customEvent to indicate the active order cart has consumed it
+      customEvent.preventDefault();
+
+      // Find product
+      const exactMatch = products.find(p => p.barcode === scannedText || p.sku.toLowerCase() === scannedText.toLowerCase());
+      if (exactMatch) {
+        handleAddCartItem(exactMatch);
+        showToast("success", `เพิ่มสำเร็จ: "${exactMatch.name}" เข้าใบสั่งซื้อแล้ว`);
+      } else {
+        showToast("error", `ไม่พบรหัสสินค้าหรือบาร์โค้ด "${scannedText}" ในระบบ`);
+      }
+    };
+
+    window.addEventListener("barcode-scanned", handleBarcodeScanned);
+    return () => {
+      window.removeEventListener("barcode-scanned", handleBarcodeScanned);
+    };
+  }, [createModalOpen, products, cart]);
 
   const handleRemoveCartItem = (barcode: string) => {
     setCart(cart.filter(item => item.barcode !== barcode));
@@ -715,8 +758,8 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                 {/* 2. Item Searching */}
                 <div className="space-y-1.5 relative">
                   <label className="text-[10px] font-bold text-gray-500 font-sans uppercase block">ค้นหาและเพิ่มรายการน้ำพริก *</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
                     <input 
                       ref={barcodeInputRef}
                       type="text" 
@@ -747,8 +790,18 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
                           }
                         }
                       }}
-                      className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-xs font-sans focus:outline-hidden focus:ring-1 focus:ring-emerald-500 bg-gray-50/50 disabled:bg-gray-100 disabled:text-gray-400"
+                      className="w-full pl-9 pr-12 py-2 border border-gray-200 rounded-lg text-xs font-sans focus:outline-hidden focus:ring-1 focus:ring-emerald-500 bg-gray-50/50 disabled:bg-gray-100 disabled:text-gray-400"
                     />
+                    {newOrderCustId && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCameraScannerOpen(true)}
+                        className="absolute right-2 p-1.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-55 rounded-md transition-all cursor-pointer flex items-center justify-center bg-transparent"
+                        title="เปิดกล้องสแกนบาร์โค้ด"
+                      >
+                        <Camera className="w-4 h-4 text-emerald-600" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Suggestion Results */}
@@ -1015,6 +1068,13 @@ export default function Orders({ userRole, onPrint }: OrdersProps) {
           </div>
         </div>
       )}
+
+      <BarcodeScannerModal 
+        isOpen={isCameraScannerOpen}
+        onClose={() => setIsCameraScannerOpen(false)}
+        onScanSuccess={handleCameraScanSuccess}
+        products={products}
+      />
     </div>
   );
 }

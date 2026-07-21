@@ -3,7 +3,7 @@ import {
   TrendingUp, Package, Users, FileText, Receipt, 
   BarChart3, Database, LogOut, Search, ShieldCheck, 
   UserCheck, X, RefreshCw, Sparkles, Menu, ShieldAlert,
-  Bell
+  Bell, Camera
 } from "lucide-react";
 
 // Import custom page modules
@@ -16,6 +16,7 @@ import Reports from "./components/Reports";
 import GasIntegration from "./components/GasIntegration";
 import Login from "./components/Login";
 import PrintDocument from "./components/PrintDocument";
+import BarcodeScannerModal from "./components/BarcodeScannerModal";
 
 export default function App() {
   // Authentication states
@@ -1187,6 +1188,88 @@ export default function App() {
   const [globalSearchText, setGlobalSearchText] = useState("");
   const [globalSearchResults, setGlobalSearchResults] = useState<{ customers: any[]; products: any[]; orders: any[] } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [isGlobalScannerOpen, setIsGlobalScannerOpen] = useState(false);
+
+  // Global Hardware Barcode Scanner Keypress Interceptor (For Physical Scanner)
+  useEffect(() => {
+    let barcodeBuffer = "";
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore keydown if user is holding standard hotkeys
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      const now = Date.now();
+      const timeDiff = now - lastKeyTime;
+      lastKeyTime = now;
+
+      // Reset buffer if delay is too long (human typing)
+      if (timeDiff > 80 && barcodeBuffer.length > 0) {
+        barcodeBuffer = "";
+      }
+
+      if (e.key.length === 1) {
+        barcodeBuffer += e.key;
+      } else if (e.key === "Enter") {
+        if (barcodeBuffer.length >= 4) {
+          // Hardware scanned barcode successfully compiled!
+          e.preventDefault();
+          e.stopPropagation();
+
+          const scannedBarcode = barcodeBuffer.trim();
+          barcodeBuffer = ""; // Reset buffer
+
+          console.log("Global Intercepted Barcode Scanner:", scannedBarcode);
+
+          // Dispatch event to listeners (like active pages/modals)
+          const barcodeEvent = new CustomEvent("barcode-scanned", { 
+            detail: scannedBarcode,
+            cancelable: true
+          });
+          const wasNotPrevented = window.dispatchEvent(barcodeEvent);
+
+          // If no active sub-module handled the scanner event, handle it globally
+          if (wasNotPrevented) {
+            // Trigger a global search
+            window.dispatchEvent(new CustomEvent("app-notification", {
+              detail: {
+                title: "ตรวจพบการยิงบาร์โค้ด",
+                message: `บาร์โค้ดสินค้า: ${scannedBarcode} (กำลังเปิดแสดงข้อมูล)`,
+                type: "success"
+              }
+            }));
+            
+            setGlobalSearchText(scannedBarcode);
+            executeGlobalSearch(scannedBarcode);
+          }
+        } else {
+          barcodeBuffer = "";
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, []);
+
+  const executeGlobalSearch = async (searchText: string) => {
+    if (!searchText.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(searchText)}`);
+      if (res.ok) {
+        const json = await res.json();
+        setGlobalSearchResults(json);
+      }
+    } catch (err) {
+      console.error("Global search failed:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   // Print State Overlay
   const [printState, setPrintState] = useState<{ active: boolean; docType: "invoice" | "receipt"; orderId: string } | null>(null);
@@ -1212,20 +1295,7 @@ export default function App() {
   // Perform Global General Search (calls API /api/search)
   const handleGlobalSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!globalSearchText.trim()) return;
-
-    setIsSearching(true);
-    try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(globalSearchText)}`);
-      if (res.ok) {
-        const json = await res.json();
-        setGlobalSearchResults(json);
-      }
-    } catch (err) {
-      console.error("Global search failed:", err);
-    } finally {
-      setIsSearching(false);
-    }
+    executeGlobalSearch(globalSearchText);
   };
 
   // If not logged in, show beautiful login screen
@@ -1253,8 +1323,8 @@ export default function App() {
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-emerald-50/85 backdrop-blur-md border-r border-emerald-100/50 text-slate-800 flex flex-col justify-between transition-transform duration-200 transform md:translate-x-0 md:relative shrink-0 shadow-[4px_0_24px_rgba(16,185,129,0.06)] ${
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       } non-printable`}>
-        <div className="flex flex-col space-y-6">
-          
+        
+        <div>
           {/* Sidebar Top: Logo */}
           <div className="p-6 pb-2 flex items-center justify-between border-b border-emerald-100/50">
             <div className="flex items-center gap-2.5">
@@ -1366,26 +1436,26 @@ export default function App() {
               }`}
             >
               <Database className="w-4 h-4" />
-              ต่อ Google Sheets (GAS)
+              เชื่อมต่อ Google Sheets (GAS)
             </button>
           </nav>
         </div>
 
-        {/* Sidebar Bottom: User Session & Log Out */}
-        <div className="p-4 border-t border-emerald-100/50 space-y-4">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-9 h-9 rounded-full bg-emerald-100/80 border border-emerald-200 text-emerald-700 flex items-center justify-center font-semibold font-sans text-xs">
-              {currentUser.username[0].toUpperCase()}
-            </div>
-            <div className="leading-tight">
-              <span className="text-xs font-bold text-emerald-950 block truncate max-w-[130px]">{currentUser.username}</span>
-              <span className="text-[10px] text-emerald-800/70 font-semibold block">{currentUser.role} Account</span>
-            </div>
-          </div>
-
+        {/* Sidebar Bottom: Logout */}
+        <div className="p-4 border-t border-emerald-100/50">
           <button
-            onClick={handleLogOut}
-            className="w-full flex items-center justify-center gap-2 py-2 border border-emerald-200/60 text-emerald-800 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 rounded-xl text-xs font-semibold font-sans cursor-pointer transition-all"
+            onClick={() => {
+              localStorage.removeItem("maemanit_user");
+              setCurrentUser(null);
+              window.dispatchEvent(new CustomEvent("app-notification", {
+                detail: {
+                  title: "ออกจากระบบแล้ว",
+                  message: "คุณได้ออกจากระบบเรียบร้อยแล้ว",
+                  type: "success"
+                }
+              }));
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             ออกจากระบบ
